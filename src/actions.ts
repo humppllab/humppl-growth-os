@@ -662,3 +662,24 @@ export async function createNote(
 
   return data ? data[0] : null
 }
+
+export async function getOpportunityDetail(id: string) {
+  const { data, error } = await supabase
+    .from('opportunities')
+    .select('*, organizations(name, industry, website_url)')
+    .eq('id', id)
+    .single()
+  if (error) throw new Error(error.message)
+  return data
+}
+
+export async function deleteNote(id: string) {
+  const { data, error } = await supabase
+    .from('notes')
+    .delete()
+    .eq('id', id)
+    .select()
+  if (error) throw new Error(error.message)
+  return data ? data[0] : null
+}
+
