@@ -1,15 +1,40 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Building2, Users, Briefcase, Calendar, CheckSquare, Trophy, ArrowRight } from "lucide-react";
 import Link from "next/link";
+import { getDashboardMetrics } from "@/actions";
 
-export default function Dashboard() {
+export default async function Dashboard() {
+  let stats;
+  try {
+    stats = await getDashboardMetrics();
+  } catch (e) {
+    console.error("Dashboard fetch error:", e);
+    stats = {
+      totalOrganizations: 0,
+      totalContacts: 0,
+      activeOpportunities: 0,
+      meetingsToday: 0,
+      pendingApprovals: 0,
+      wonDeals: 0,
+      pipelineSummary: [
+        { stage: "Discovery Done", count: 0, value: "₹0", color: "bg-blue-500" },
+        { stage: "Proposal Sent", count: 0, value: "₹0", color: "bg-indigo-500" },
+        { stage: "Negotiation", count: 0, value: "₹0", color: "bg-amber-500" },
+        { stage: "Approval Pending", count: 0, value: "₹0", color: "bg-rose-500" },
+      ],
+      recentActivities: [
+        { title: "Setup error: Please check Supabase connection.", time: "Just now", type: "system" }
+      ]
+    };
+  }
+
   const metrics = [
-    { title: "Total Organizations", value: "124", icon: Building2, color: "text-blue-600", bg: "bg-blue-100" },
-    { title: "Total Contacts", value: "843", icon: Users, color: "text-indigo-600", bg: "bg-indigo-100" },
-    { title: "Active Opportunities", value: "32", icon: Briefcase, color: "text-amber-600", bg: "bg-amber-100" },
-    { title: "Meetings Today", value: "5", icon: Calendar, color: "text-emerald-600", bg: "bg-emerald-100" },
-    { title: "Pending Approvals", value: "8", icon: CheckSquare, color: "text-rose-600", bg: "bg-rose-100" },
-    { title: "Won Deals", value: "14", icon: Trophy, color: "text-purple-600", bg: "bg-purple-100" },
+    { title: "Total Organizations", value: stats.totalOrganizations.toString(), icon: Building2, color: "text-blue-600", bg: "bg-blue-100" },
+    { title: "Total Contacts", value: stats.totalContacts.toString(), icon: Users, color: "text-indigo-600", bg: "bg-indigo-100" },
+    { title: "Active Opportunities", value: stats.activeOpportunities.toString(), icon: Briefcase, color: "text-amber-600", bg: "bg-amber-100" },
+    { title: "Meetings Today", value: stats.meetingsToday.toString(), icon: Calendar, color: "text-emerald-600", bg: "bg-emerald-100" },
+    { title: "Pending Approvals", value: stats.pendingApprovals.toString(), icon: CheckSquare, color: "text-rose-600", bg: "bg-rose-100" },
+    { title: "Won Deals", value: stats.wonDeals.toString(), icon: Trophy, color: "text-purple-600", bg: "bg-purple-100" },
   ];
 
   return (
@@ -52,23 +77,22 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-6">
-              {[
-                { title: "Proposal sent to TechCorp", time: "2 hours ago", type: "document" },
-                { title: "Meeting with Sarah from Innovate LLC", time: "4 hours ago", type: "meeting" },
-                { title: "New deal added: HR Consulting for Startup X", time: "Yesterday", type: "opportunity" },
-                { title: "Contract approved by management", time: "Yesterday", type: "approval" },
-              ].map((activity, i) => (
-                <div key={i} className="flex">
-                  <div className="flex flex-col items-center mr-4">
-                    <div className="w-2 h-2 bg-blue-600 rounded-full mt-2"></div>
-                    {i !== 3 && <div className="w-px h-full bg-gray-200 mt-2"></div>}
+              {stats.recentActivities.length === 0 ? (
+                <p className="text-sm text-gray-500">No recent activity.</p>
+              ) : (
+                stats.recentActivities.map((activity: any, i: number) => (
+                  <div key={i} className="flex">
+                    <div className="flex flex-col items-center mr-4">
+                      <div className="w-2 h-2 bg-blue-600 rounded-full mt-2"></div>
+                      {i !== stats.recentActivities.length - 1 && <div className="w-px h-full bg-gray-200 mt-2"></div>}
+                    </div>
+                    <div className="pb-4">
+                      <p className="text-sm font-medium text-gray-900">{activity.title}</p>
+                      <p className="text-xs text-gray-500 mt-1">{activity.time}</p>
+                    </div>
                   </div>
-                  <div className="pb-4">
-                    <p className="text-sm font-medium text-gray-900">{activity.title}</p>
-                    <p className="text-xs text-gray-500 mt-1">{activity.time}</p>
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </CardContent>
         </Card>
@@ -80,19 +104,14 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {[
-                { stage: "Discovery Done", count: 12, value: "$120,000", color: "bg-blue-500" },
-                { stage: "Proposal Sent", count: 8, value: "$85,000", color: "bg-indigo-500" },
-                { stage: "Negotiation", count: 5, value: "$150,000", color: "bg-amber-500" },
-                { stage: "Approval Pending", count: 3, value: "$45,000", color: "bg-rose-500" },
-              ].map((stage, i) => (
+              {stats.pipelineSummary.map((stage: any, i: number) => (
                 <div key={i}>
                   <div className="flex justify-between text-sm mb-1">
                     <span className="font-medium text-gray-700">{stage.stage}</span>
                     <span className="text-gray-900 font-semibold">{stage.value} <span className="text-gray-400 font-normal">({stage.count})</span></span>
                   </div>
                   <div className="w-full bg-gray-100 rounded-full h-2">
-                    <div className={`${stage.color} h-2 rounded-full`} style={{ width: `${(stage.count / 30) * 100}%` }}></div>
+                    <div className={`${stage.color} h-2 rounded-full`} style={{ width: `${Math.min(100, (stage.count / 30) * 100)}%` }}></div>
                   </div>
                 </div>
               ))}

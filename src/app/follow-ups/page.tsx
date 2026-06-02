@@ -1,16 +1,125 @@
+'use client'
+
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/Button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/Table";
 import { Badge } from "@/components/ui/Badge";
-import { Plus, MoreHorizontal } from "lucide-react";
+import { Plus, MoreHorizontal, X, Loader2 } from "lucide-react";
+import { getFollowUps, createFollowUp, getOrganizations, toggleFollowUpStatus } from "@/actions";
+
+interface Organization {
+  id: number;
+  name: string;
+}
+
+interface FollowUp {
+  id: string;
+  created_at: string;
+  organization_id: number;
+  date: string;
+  owner: string;
+  status: string;
+  organizations?: {
+    name: string;
+  } | null;
+}
 
 export default function FollowUpsPage() {
-  const followUps = [
-    { id: 1, client: "Innovate LLC", date: "Today", owner: "Alex D.", status: "Pending" },
-    { id: 2, client: "Stark Enterprises", date: "Tomorrow", owner: "John K.", status: "Pending" },
-    { id: 3, client: "TechCorp Industries", date: "Oct 18, 2024", owner: "Sarah M.", status: "Scheduled" },
-    { id: 4, client: "Global Finance Group", date: "Yesterday", owner: "Sarah M.", status: "Completed" },
-    { id: 5, client: "Wayne Corp", date: "Oct 12, 2024", owner: "Alex D.", status: "Completed" },
-  ];
+  const [followUps, setFollowUps] = useState<FollowUp[]>([]);
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [organizationId, setOrganizationId] = useState("");
+  const [date, setDate] = useState("");
+  const [owner, setOwner] = useState("Sumit");
+  const [status, setStatus] = useState("Pending");
+
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const [followUpsData, orgsData] = await Promise.all([
+          getFollowUps(),
+          getOrganizations()
+        ]);
+        setFollowUps(followUpsData);
+        setOrganizations(orgsData);
+        if (orgsData.length > 0) {
+          setOrganizationId(orgsData[0].id.toString());
+        }
+      } catch (err) {
+        console.error("Failed to load follow-ups data:", err);
+        setError("Could not load follow-ups. Please try again.");
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, []);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!organizationId || !date || !owner) return;
+    setSubmitting(true);
+    setError("");
+    try {
+      const orgId = parseInt(organizationId);
+      const newFollowUp = await createFollowUp(orgId, date, owner, status);
+      if (newFollowUp) {
+        const orgObj = organizations.find(o => o.id === orgId);
+        const followUpWithOrg: FollowUp = {
+          ...newFollowUp,
+          organizations: orgObj ? { name: orgObj.name } : null
+        };
+        setFollowUps([...followUps, followUpWithOrg].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
+        setIsModalOpen(false);
+        setDate("");
+        setOwner("Sumit");
+        setStatus("Pending");
+      }
+    } catch (err: any) {
+      console.error("Failed to create follow-up:", err);
+      setError("Failed to create follow-up. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleToggleStatus = async (id: string, currentStatus: string) => {
+    try {
+      const updated = await toggleFollowUpStatus(id, currentStatus);
+      if (updated) {
+        setFollowUps(followUps.map(f => f.id === id ? { ...f, status: updated.status } : f));
+      }
+    } catch (err) {
+      console.error("Failed to toggle follow-up status:", err);
+    }
+  };
+
+  const formatFollowUpDate = (dateStr: string) => {
+    try {
+      const d = new Date(dateStr);
+      const today = new Date();
+      const yesterday = new Date();
+      yesterday.setDate(today.getDate() - 1);
+
+      if (d.toDateString() === today.toDateString()) {
+        return { text: "Today", isAlert: true };
+      }
+      if (d.toDateString() === yesterday.toDateString()) {
+        return { text: "Yesterday", isAlert: true };
+      }
+
+      return {
+        text: d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
+        isAlert: d < today && status !== 'Completed'
+      };
+    } catch (e) {
+      return { text: dateStr, isAlert: false };
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -19,44 +128,144 @@ export default function FollowUpsPage() {
           <h1 className="text-2xl font-bold text-gray-900">Follow-ups</h1>
           <p className="text-sm text-gray-500 mt-1">Track pending client communications and actions.</p>
         </div>
-        <Button>
+        <Button onClick={() => setIsModalOpen(true)}>
           <Plus className="mr-2 h-4 w-4" /> Add Follow-up
         </Button>
       </div>
 
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Client</TableHead>
-            <TableHead>Follow-Up Date</TableHead>
-            <TableHead>Owner</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead className="w-[100px]">Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {followUps.map((followUp) => (
-            <TableRow key={followUp.id}>
-              <TableCell className="font-medium text-gray-900">{followUp.client}</TableCell>
-              <TableCell className={followUp.date === 'Today' || followUp.date === 'Yesterday' ? 'text-red-600 font-medium' : ''}>
-                {followUp.date}
-              </TableCell>
-              <TableCell>{followUp.owner}</TableCell>
-              <TableCell>
-                <Badge variant={followUp.status === 'Completed' ? 'success' : followUp.status === 'Scheduled' ? 'secondary' : 'warning'}>
-                  {followUp.status}
-                </Badge>
-              </TableCell>
-              <TableCell>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
-                  <span className="sr-only">Open menu</span>
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
-              </TableCell>
+      {error && (
+        <div className="bg-red-50 text-red-600 p-4 rounded-xl text-sm border border-red-100">
+          {error}
+        </div>
+      )}
+
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 text-blue-600 animate-spin" />
+        </div>
+      ) : followUps.length === 0 ? (
+        <div className="bg-white border rounded-xl p-12 text-center">
+          <p className="text-gray-500 text-sm">No follow-up items found. Click "Add Follow-up" to create one.</p>
+        </div>
+      ) : (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Client / Company</TableHead>
+              <TableHead>Follow-Up Date</TableHead>
+              <TableHead>Owner</TableHead>
+              <TableHead>Status (Click to toggle)</TableHead>
+              <TableHead className="w-[100px]">Actions</TableHead>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+          </TableHeader>
+          <TableBody>
+            {followUps.map((followUp) => {
+              const dateInfo = formatFollowUpDate(followUp.date);
+              return (
+                <TableRow key={followUp.id}>
+                  <TableCell className="font-medium text-gray-900">{followUp.organizations?.name || '--'}</TableCell>
+                  <TableCell className={dateInfo.isAlert && followUp.status !== 'Completed' ? 'text-red-600 font-medium' : ''}>
+                    {dateInfo.text}
+                  </TableCell>
+                  <TableCell>{followUp.owner}</TableCell>
+                  <TableCell>
+                    <button 
+                      onClick={() => handleToggleStatus(followUp.id, followUp.status)}
+                      className="focus:outline-none transition-transform active:scale-95"
+                    >
+                      <Badge variant={followUp.status === 'Completed' ? 'success' : 'warning'}>
+                        {followUp.status}
+                      </Badge>
+                    </button>
+                  </TableCell>
+                  <TableCell>
+                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                      <span className="sr-only">Open menu</span>
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      )}
+
+      {/* Add Follow-up Modal */}
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden border border-gray-100 animate-in fade-in zoom-in duration-200">
+            <div className="px-6 py-4 bg-gray-50 border-b flex items-center justify-between">
+              <h2 className="font-bold text-gray-900 text-lg">Add New Follow-up</h2>
+              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Client Organization *</label>
+                {organizations.length === 0 ? (
+                  <p className="text-sm text-red-500">Please create an organization first.</p>
+                ) : (
+                  <select 
+                    value={organizationId}
+                    onChange={(e) => setOrganizationId(e.target.value)}
+                    className="w-full px-4 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all bg-white"
+                  >
+                    {organizations.map(org => (
+                      <option key={org.id} value={org.id}>{org.name}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Follow-Up Date *</label>
+                <input 
+                  type="date" 
+                  required
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  className="w-full px-4 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Owner *</label>
+                <input 
+                  type="text" 
+                  required
+                  value={owner}
+                  onChange={(e) => setOwner(e.target.value)}
+                  placeholder="e.g. Sumit" 
+                  className="w-full px-4 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                <select 
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value)}
+                  className="w-full px-4 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all bg-white"
+                >
+                  <option value="Pending">Pending</option>
+                  <option value="Completed">Completed</option>
+                </select>
+              </div>
+              <div className="flex justify-end gap-3 pt-4 border-t">
+                <Button type="button" variant="ghost" onClick={() => setIsModalOpen(false)} disabled={submitting}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={submitting || !organizationId || !date || !owner}>
+                  {submitting ? (
+                    <>
+                      <Loader2 className="animate-spin mr-2 h-4 w-4" /> Creating...
+                    </>
+                  ) : "Create Follow-up"}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
