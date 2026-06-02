@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/Button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/Table";
 import { Badge } from "@/components/ui/Badge";
 import { Plus, MoreHorizontal, X, Loader2 } from "lucide-react";
+import Link from "next/link";
 import { getOpportunities, createOpportunity, getOrganizations } from "@/actions";
 import { formatRupees } from "@/lib/utils";
 
@@ -168,7 +169,11 @@ export default function OpportunitiesPage() {
           <TableBody>
             {opportunities.map((opp) => (
               <TableRow key={opp.id}>
-                <TableCell className="font-medium text-blue-600">{opp.name}</TableCell>
+                <TableCell className="font-medium text-blue-600">
+                  <Link href={`/opportunities/${opp.id}`} className="hover:underline">
+                    {opp.name}
+                  </Link>
+                </TableCell>
                 <TableCell>{opp.organizations?.name || '--'}</TableCell>
                 <TableCell>{opp.type || '--'}</TableCell>
                 <TableCell>
