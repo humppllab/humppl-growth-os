@@ -735,7 +735,7 @@ export async function loginAction(email: string, password?: string) {
     })
     return { success: true }
   }
-  throw new Error("Invalid credentials. Please use admin@humppl.com / admin.")
+  return { error: "Invalid credentials. Please use admin@humppl.com / admin." }
 }
 
 export async function logoutAction() {
