@@ -22,7 +22,9 @@ export default function LoginPage() {
 
     try {
       const res = await loginAction(email, password)
-      if (res.success) {
+      if (res && 'error' in res && res.error) {
+        setError(res.error)
+      } else if (res.success) {
         router.push("/")
         router.refresh()
       }
@@ -39,7 +41,9 @@ export default function LoginPage() {
     setError("")
     try {
       const res = await loginAction("admin@humppl.com")
-      if (res.success) {
+      if (res && 'error' in res && res.error) {
+        setError(res.error)
+      } else if (res.success) {
         router.push("/")
         router.refresh()
       }
