@@ -129,7 +129,23 @@ export default function PipelinePage() {
 
   // Build column structures dynamically
   const columns = PIPELINE_STAGES.map(stage => {
-    const deals = opportunities.filter(opp => opp.stage === stage);
+    const deals = opportunities.filter(opp => {
+      let currentStage = opp.stage;
+      if (!PIPELINE_STAGES.includes(currentStage)) {
+        if (currentStage === "New Lead") currentStage = "Introductory Email";
+        else if (currentStage === "Qualified" || currentStage === "Meeting Booked") currentStage = "1st Meeting";
+        else if (currentStage === "Discovery Done") currentStage = "2nd Meeting";
+        else if (currentStage === "Solution Mapped" || currentStage === "Proposal Draft") currentStage = "Technical Proposal";
+        else if (currentStage === "Proposal Sent") currentStage = "Commercial Proposal";
+        else if (currentStage === "Follow-Up Active") currentStage = "4th Meeting";
+        else if (currentStage === "Negotiation") currentStage = "Negotiations";
+        else if (currentStage === "Approval Pending") currentStage = "SLA Sent";
+        else if (currentStage === "Won") currentStage = "SLA Signed";
+        else if (currentStage === "Lost") currentStage = "Internal Handover to Delivery";
+        else currentStage = "Introductory Email"; // Default fallback
+      }
+      return currentStage === stage;
+    });
     return {
       name: stage,
       deals
