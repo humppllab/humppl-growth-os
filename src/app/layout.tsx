@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import Sidebar from "@/components/layout/Sidebar";
 import TopNavbar from "@/components/layout/TopNavbar";
+import WorkflowNavigator from "@/components/layout/WorkflowNavigator";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -24,6 +25,7 @@ export default function RootLayout({
           <TopNavbar />
           <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
             {children}
+            <WorkflowNavigator />
           </main>
         </div>
       </body>

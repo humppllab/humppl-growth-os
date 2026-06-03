@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Building2, Users, Briefcase, Calendar, CheckSquare, Trophy, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { getDashboardMetrics } from "@/actions";
+import ExportCsvButton from "@/components/ui/ExportCsvButton";
 
 export default async function Dashboard() {
   let stats;
@@ -43,6 +44,9 @@ export default async function Dashboard() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
           <p className="text-sm text-gray-500 mt-1">Welcome back! Here's what's happening with your clients today.</p>
+        </div>
+        <div className="shrink-0">
+          <ExportCsvButton />
         </div>
       </div>
 

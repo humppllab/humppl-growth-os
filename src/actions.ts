@@ -1,8 +1,8 @@
 'use server'
-
+ 
 import { supabase } from './lib/supabase'
-
 import { formatRupees } from './lib/utils'
+import { cookies } from 'next/headers'
 
 // ==========================================
 // ACTIVITY TIMELINE ACTIONS
@@ -309,12 +309,28 @@ export async function createProposal(
 // APPROVALS ACTIONS
 // ==========================================
 export async function getApprovals() {
-  const { data, error } = await supabase
+  const { data: approvals, error } = await supabase
     .from('approvals')
-    .select('*, organizations(name)')
+    .select('*')
     .order('created_at', { ascending: false })
   if (error) throw new Error(error.message)
-  return data || []
+  
+  if (!approvals || approvals.length === 0) return []
+
+  const { data: orgs, error: orgsError } = await supabase
+    .from('organizations')
+    .select('id, name')
+
+  if (orgsError) {
+    console.error("Error mapping organizations:", orgsError.message)
+    return approvals.map(app => ({ ...app, organizations: null }))
+  }
+
+  const orgMap = new Map(orgs.map(o => [o.id, o.name]))
+  return approvals.map(app => ({
+    ...app,
+    organizations: app.organization_id ? { name: orgMap.get(app.organization_id) || null } : null
+  }))
 }
 
 export async function createApproval(
@@ -346,19 +362,37 @@ export async function updateApprovalStatus(id: string, status: string) {
     .from('approvals')
     .update({ status })
     .eq('id', id)
-    .select('*, organizations(name)')
+    .select('*')
   if (error) throw new Error(error.message)
 
-  if (data && data[0]) {
-    await logActivity(
-      'Approval Status Updated',
-      `Approval for "${data[0].title}" was ${status}`,
-      'approval_status_updated',
-      undefined,
-      data[0].organization_id
-    )
+  if (!data || data.length === 0) return null
+
+  const approval = data[0]
+  let orgName = null
+
+  if (approval.organization_id) {
+    const { data: orgData } = await supabase
+      .from('organizations')
+      .select('name')
+      .eq('id', approval.organization_id)
+      .single()
+    if (orgData) orgName = orgData.name
   }
-  return data ? data[0] : null
+
+  const result = {
+    ...approval,
+    organizations: orgName ? { name: orgName } : null
+  }
+
+  await logActivity(
+    'Approval Status Updated',
+    `Approval for "${result.title}" was ${status}`,
+    'approval_status_updated',
+    undefined,
+    result.organization_id
+  )
+
+  return result
 }
 
 // ==========================================
@@ -682,4 +716,32 @@ export async function deleteNote(id: string) {
   if (error) throw new Error(error.message)
   return data ? data[0] : null
 }
+
+// ==========================================
+// AUTHENTICATION ACTIONS
+// ==========================================
+export async function loginAction(email: string, password?: string) {
+  const cleanEmail = email ? email.toLowerCase().trim() : ''
+  const cleanPassword = password ? password.trim() : ''
+
+  if (cleanEmail === 'admin@humppl.com' && (cleanPassword === 'admin' || cleanPassword === '')) {
+    const cookieStore = await cookies()
+    cookieStore.set('humppl_session', 'authenticated', {
+      path: '/',
+      maxAge: 60 * 60 * 24 * 7, // 1 week
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+    })
+    return { success: true }
+  }
+  throw new Error("Invalid credentials. Please use admin@humppl.com / admin.")
+}
+
+export async function logoutAction() {
+  const cookieStore = await cookies()
+  cookieStore.delete('humppl_session')
+  return { success: true }
+}
+
 
