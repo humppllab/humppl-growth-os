@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Check, X, Plus, Loader2, Search, SlidersHorizontal } from "lucide-react";
 import { getApprovals, createApproval, updateApprovalStatus, getOrganizations } from "@/actions";
 import { formatRupees } from "@/lib/utils";
+import EmailComposerButton from "@/components/ui/EmailComposerButton";
 
 interface Organization {
   id: number;
@@ -180,6 +181,7 @@ export default function ApprovalsPage() {
           <p className="text-sm text-gray-500 mt-1">Review and manage pending approval requests.</p>
         </div>
         <div className="flex items-center gap-3">
+          <EmailComposerButton />
           <Button 
             variant="outline" 
             onClick={() => setIsFilterOpen(!isFilterOpen)}

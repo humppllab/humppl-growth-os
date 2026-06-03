@@ -121,7 +121,7 @@ export async function createContact(
 export async function getOpportunities() {
   const { data, error } = await supabase
     .from('opportunities')
-    .select('*, organizations(name)')
+    .select('*, organizations(name, contacts(*))')
     .order('created_at', { ascending: false })
   if (error) throw new Error(error.message)
   return data || []
@@ -743,5 +743,124 @@ export async function logoutAction() {
   cookieStore.delete('humppl_session')
   return { success: true }
 }
+
+// ==========================================
+// UNIFIED CRM WORKFLOW ACTIONS
+// ==========================================
+export async function createContactWithOrgAndOpp(
+  firstName: string,
+  lastName: string,
+  email: string,
+  jobTitle: string,
+  phone: string,
+  mobile: string,
+  orgName: string,
+  orgIndustry: string,
+  orgWebsite: string,
+  oppName: string,
+  oppType: string,
+  oppStage: string,
+  oppValue: number,
+  oppOwner: string
+) {
+  // 1. Create or Find Organization
+  let orgId: number
+  const { data: existingOrgs, error: findError } = await supabase
+    .from('organizations')
+    .select('id')
+    .eq('name', orgName)
+    .limit(1)
+
+  if (findError) throw new Error(findError.message)
+
+  if (existingOrgs && existingOrgs.length > 0) {
+    orgId = existingOrgs[0].id
+  } else {
+    const { data: newOrg, error: orgError } = await supabase
+      .from('organizations')
+      .insert([{ name: orgName, industry: orgIndustry, website_url: orgWebsite }])
+      .select()
+    if (orgError) throw new Error(orgError.message)
+    orgId = newOrg[0].id
+  }
+
+  // 2. Format jobTitle to store phone numbers
+  const formattedJobTitle = `${jobTitle || 'N/A'} | Ph: ${phone || 'N/A'} | Mob: ${mobile || 'N/A'}`
+
+  // 3. Create Contact linked to Org
+  const { data: newContact, error: contactError } = await supabase
+    .from('contacts')
+    .insert([{ 
+      first_name: firstName, 
+      last_name: lastName, 
+      email, 
+      job_title: formattedJobTitle, 
+      organization_id: orgId 
+    }])
+    .select()
+
+  if (contactError) throw new Error(contactError.message)
+  const contact = newContact[0]
+
+  // 4. Create Opportunity linked to Org
+  const { data: newOpp, error: oppError } = await supabase
+    .from('opportunities')
+    .insert([{ 
+      name: oppName, 
+      type: oppType, 
+      stage: oppStage, 
+      value: oppValue, 
+      owner: oppOwner, 
+      organization_id: orgId 
+    }])
+    .select()
+
+  if (oppError) throw new Error(oppError.message)
+  const opp = newOpp[0]
+
+  // 5. Automatically create a Note detailing the contact and phone numbers
+  await createNote(
+    `Contact created via Unified Flow.\nPhone: ${phone || 'N/A'}\nMobile: ${mobile || 'N/A'}\nLinked Organization: ${orgName}\nLinked Opportunity: ${oppName} (${formatRupees(oppValue)})`,
+    opp.id,
+    orgId,
+    contact.id,
+    oppOwner
+  )
+
+  // 6. Log activity timeline
+  await logActivity(
+    'Unified Contact Created',
+    `Created contact ${firstName} ${lastName}, organization ${orgName}, and opportunity ${oppName}`,
+    'contact_created',
+    opp.id,
+    orgId,
+    contact.id
+  )
+
+  return { contact, orgId, opp }
+}
+
+export async function updateMeetingDateTime(id: string, dateTimeStr: string) {
+  const { data, error } = await supabase
+    .from('meetings')
+    .update({ date_time: dateTimeStr })
+    .eq('id', id)
+    .select()
+
+  if (error) throw new Error(error.message)
+
+  if (data && data[0]) {
+    await logActivity(
+      'Meeting Rescheduled',
+      `Rescheduled meeting: "${data[0].title}" to ${new Date(dateTimeStr).toLocaleString()}`,
+      'meeting_scheduled',
+      undefined,
+      data[0].organization_id
+    )
+  }
+
+  return data ? data[0] : null
+}
+
 
 

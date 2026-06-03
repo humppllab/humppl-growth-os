@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/Button";
 import { Loader2 } from "lucide-react";
 import { getProfile, updateProfile } from "@/actions";
+import EmailComposerButton from "@/components/ui/EmailComposerButton";
 
 export default function SettingsPage() {
   const [firstName, setFirstName] = useState("");
@@ -55,9 +56,12 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6 max-w-4xl">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
-        <p className="text-sm text-gray-500 mt-1">Manage your account and platform preferences.</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
+          <p className="text-sm text-gray-500 mt-1">Manage your account and platform preferences.</p>
+        </div>
+        <EmailComposerButton />
       </div>
 
       {success && (

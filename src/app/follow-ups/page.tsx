@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/Badge";
 import { Plus, MoreHorizontal, X, Loader2, Search, SlidersHorizontal } from "lucide-react";
 import { getFollowUps, createFollowUp, getOrganizations, toggleFollowUpStatus } from "@/actions";
+import EmailComposerButton from "@/components/ui/EmailComposerButton";
 
 interface Organization {
   id: number;
@@ -202,6 +203,7 @@ export default function FollowUpsPage() {
           <p className="text-sm text-gray-500 mt-1">Track pending client communications and actions.</p>
         </div>
         <div className="flex items-center gap-3">
+          <EmailComposerButton />
           <Button 
             variant="outline" 
             onClick={() => setIsFilterOpen(!isFilterOpen)}

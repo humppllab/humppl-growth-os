@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { CheckCircle2, Circle, Plus, X, Loader2 } from "lucide-react";
 import { getOnboardingList, createOnboarding, toggleOnboardingTask, getOrganizations } from "@/actions";
+import EmailComposerButton from "@/components/ui/EmailComposerButton";
 
 interface Organization {
   id: number;
@@ -129,9 +130,12 @@ export default function OnboardingPage() {
           <h1 className="text-2xl font-bold text-gray-900">Client Onboarding</h1>
           <p className="text-sm text-gray-500 mt-1">Track the onboarding progress of new clients and projects.</p>
         </div>
-        <Button onClick={() => setIsModalOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" /> Start Onboarding
-        </Button>
+        <div className="flex items-center gap-3">
+          <EmailComposerButton />
+          <Button onClick={() => setIsModalOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" /> Start Onboarding
+          </Button>
+        </div>
       </div>
 
       {error && (

@@ -4,8 +4,8 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/Button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/Table";
 import { Badge } from "@/components/ui/Badge";
-import { Plus, MoreHorizontal, Calendar as CalendarIcon, X, Loader2, Search, SlidersHorizontal } from "lucide-react";
-import { getMeetings, createMeeting, getOrganizations } from "@/actions";
+import { Plus, Calendar as CalendarIcon, X, Loader2, Search, SlidersHorizontal } from "lucide-react";
+import { getMeetings, createMeeting, getOrganizations, updateMeetingDateTime } from "@/actions";
 
 interface Organization {
   id: number;
@@ -32,6 +32,12 @@ export default function MeetingsPage() {
   const [organizationId, setOrganizationId] = useState("");
   const [dateTime, setDateTime] = useState("");
   const [status, setStatus] = useState("Scheduled");
+
+  // Rescheduling modal state
+  const [selectedMeetingForReschedule, setSelectedMeetingForReschedule] = useState<Meeting | null>(null);
+  const [rescheduleDateTime, setRescheduleDateTime] = useState("");
+  const [reschedulingSubmitting, setReschedulingSubmitting] = useState(false);
+  const [rescheduleError, setRescheduleError] = useState("");
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -67,6 +73,21 @@ export default function MeetingsPage() {
     loadData();
   }, []);
 
+  // Update reschedule date time input when meeting selected
+  useEffect(() => {
+    if (selectedMeetingForReschedule) {
+      try {
+        const dt = new Date(selectedMeetingForReschedule.date_time);
+        const tzoffset = dt.getTimezoneOffset() * 60000;
+        const localISOTime = (new Date(dt.getTime() - tzoffset)).toISOString().slice(0, 16);
+        setRescheduleDateTime(localISOTime);
+      } catch (e) {
+        setRescheduleDateTime("");
+      }
+      setRescheduleError("");
+    }
+  }, [selectedMeetingForReschedule]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title || !organizationId || !dateTime) return;
@@ -92,6 +113,26 @@ export default function MeetingsPage() {
       setError("Failed to schedule meeting. Please try again.");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleRescheduleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedMeetingForReschedule || !rescheduleDateTime) return;
+    setReschedulingSubmitting(true);
+    setRescheduleError("");
+    try {
+      const updated = await updateMeetingDateTime(selectedMeetingForReschedule.id, rescheduleDateTime);
+      if (updated) {
+        setMeetings(meetings.map(m => m.id === selectedMeetingForReschedule.id ? { ...m, date_time: rescheduleDateTime } : m).sort((a, b) => new Date(a.date_time).getTime() - new Date(b.date_time).getTime()));
+        setSelectedMeetingForReschedule(null);
+        alert("Meeting rescheduled successfully!");
+      }
+    } catch (err: any) {
+      console.error(err);
+      setRescheduleError(err.message || "Failed to reschedule meeting.");
+    } finally {
+      setReschedulingSubmitting(false);
     }
   };
 
@@ -314,7 +355,7 @@ export default function MeetingsPage() {
                       <TableHead>Organization</TableHead>
                       <TableHead>Date & Time</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead className="w-[100px]">Actions</TableHead>
+                      <TableHead className="w-[120px]">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -337,9 +378,13 @@ export default function MeetingsPage() {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <span className="sr-only">Open menu</span>
-                            <MoreHorizontal className="h-4 w-4" />
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => setSelectedMeetingForReschedule(meeting)}
+                            className="h-8 text-xs font-semibold text-gray-700 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-300"
+                          >
+                            Reschedule
                           </Button>
                         </TableCell>
                       </TableRow>
@@ -433,6 +478,54 @@ export default function MeetingsPage() {
                       <Loader2 className="animate-spin mr-2 h-4 w-4" /> Scheduling...
                     </>
                   ) : "Schedule"}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Reschedule Meeting Modal */}
+      {selectedMeetingForReschedule && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden border border-gray-100 animate-in fade-in zoom-in duration-200">
+            <div className="px-6 py-4 bg-gray-50 border-b flex items-center justify-between">
+              <h2 className="font-bold text-gray-900 text-lg">Reschedule Meeting</h2>
+              <button onClick={() => setSelectedMeetingForReschedule(null)} className="text-gray-400 hover:text-gray-600 transition-colors">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <form onSubmit={handleRescheduleSubmit} className="p-6 space-y-4">
+              <div>
+                <p className="text-sm text-gray-500 mb-2">
+                  Rescheduling meeting: <span className="font-semibold text-gray-800">{selectedMeetingForReschedule.title}</span>
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">New Date & Time *</label>
+                <input 
+                  type="datetime-local" 
+                  required
+                  value={rescheduleDateTime}
+                  onChange={(e) => setRescheduleDateTime(e.target.value)}
+                  className="w-full px-4 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                />
+              </div>
+              
+              {rescheduleError && (
+                <div className="text-xs text-red-600 bg-red-50 p-2 rounded-lg">{rescheduleError}</div>
+              )}
+
+              <div className="flex justify-end gap-3 pt-4 border-t">
+                <Button type="button" variant="ghost" onClick={() => setSelectedMeetingForReschedule(null)} disabled={reschedulingSubmitting}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={reschedulingSubmitting || !rescheduleDateTime}>
+                  {reschedulingSubmitting ? (
+                    <>
+                      <Loader2 className="animate-spin mr-2 h-4 w-4" /> Rescheduling...
+                    </>
+                  ) : "Reschedule"}
                 </Button>
               </div>
             </form>

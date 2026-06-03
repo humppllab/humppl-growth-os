@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Plus, MoreHorizontal, FileText, X, Loader2, Search, SlidersHorizontal } from "lucide-react";
 import { getProposals, createProposal, getOrganizations } from "@/actions";
 import { formatRupees } from "@/lib/utils";
+import EmailComposerButton from "@/components/ui/EmailComposerButton";
 
 interface Organization {
   id: number;
@@ -201,6 +202,7 @@ export default function ProposalsPage() {
           <p className="text-sm text-gray-500 mt-1">Track proposal statuses and document lifecycles.</p>
         </div>
         <div className="flex items-center gap-3">
+          <EmailComposerButton />
           <Button 
             variant="outline" 
             onClick={() => setIsFilterOpen(!isFilterOpen)}

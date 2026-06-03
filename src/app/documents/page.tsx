@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/Button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/Table";
 import { Plus, MoreHorizontal, FileText, Link as LinkIcon, FileImage, X, Loader2 } from "lucide-react";
 import { getDocuments, createDocument, getOrganizations } from "@/actions";
+import EmailComposerButton from "@/components/ui/EmailComposerButton";
 
 interface Organization {
   id: number;
@@ -128,9 +129,12 @@ export default function DocumentsPage() {
           <h1 className="text-2xl font-bold text-gray-900">Documents</h1>
           <p className="text-sm text-gray-500 mt-1">Manage and access all client files and agreements.</p>
         </div>
-        <Button onClick={() => setIsModalOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" /> Upload Document
-        </Button>
+        <div className="flex items-center gap-3">
+          <EmailComposerButton />
+          <Button onClick={() => setIsModalOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" /> Upload Document
+          </Button>
+        </div>
       </div>
 
       {error && (

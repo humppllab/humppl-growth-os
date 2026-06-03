@@ -18,9 +18,7 @@ import {
 
 const navItems = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
-  { name: 'Organizations', href: '/organizations', icon: Building2 },
   { name: 'Contacts', href: '/contacts', icon: Users },
-  { name: 'Opportunities', href: '/opportunities', icon: Briefcase },
   { name: 'Pipeline', href: '/pipeline', icon: KanbanSquare },
   { name: 'Meetings', href: '/meetings', icon: Calendar },
   { name: 'Follow-ups', href: '/follow-ups', icon: Clock },
