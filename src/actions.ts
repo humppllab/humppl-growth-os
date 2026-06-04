@@ -720,22 +720,61 @@ export async function deleteNote(id: string) {
 // ==========================================
 // AUTHENTICATION ACTIONS
 // ==========================================
-export async function loginAction(email: string, password?: string) {
+export async function sendOtpAction(email: string) {
   const cleanEmail = email ? email.toLowerCase().trim() : ''
-  const cleanPassword = password ? password.trim() : ''
-
-  if (cleanEmail === 'admin@humppl.com' && (cleanPassword === 'admin' || cleanPassword === '')) {
-    const cookieStore = await cookies()
-    cookieStore.set('humppl_session', 'authenticated', {
-      path: '/',
-      maxAge: 60 * 60 * 24 * 7, // 1 week
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-    })
-    return { success: true }
+  if (!cleanEmail || !cleanEmail.includes('@')) {
+    return { error: "Please enter a valid email address." }
   }
-  return { error: "Invalid credentials. Please use admin@humppl.com / admin." }
+  // Enforce domain restrictions
+  if (!cleanEmail.includes('humppl')) {
+    return { error: "Access denied. Only @humppl.com or humppl-authorized emails can login." }
+  }
+  // Generate random 6-digit OTP
+  const otp = Math.floor(100000 + Math.random() * 900000).toString()
+  
+  const cookieStore = await cookies()
+  cookieStore.set('humppl_temp_otp', JSON.stringify({ email: cleanEmail, otp }), {
+    path: '/',
+    maxAge: 60 * 5, // 5 minutes validity
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+  })
+  
+  console.log(`[OTP Sent] Email: ${cleanEmail} | OTP: ${otp}`)
+  return { success: true, otp }
+}
+
+export async function verifyOtpAction(email: string, enteredOtp: string) {
+  const cleanEmail = email ? email.toLowerCase().trim() : ''
+  const cleanOtp = enteredOtp ? enteredOtp.trim() : ''
+  
+  const cookieStore = await cookies()
+  const tempOtpCookie = cookieStore.get('humppl_temp_otp')
+  
+  if (!tempOtpCookie) {
+    return { error: "OTP expired or not requested. Please request a new OTP." }
+  }
+  
+  try {
+    const { email: savedEmail, otp: savedOtp } = JSON.parse(tempOtpCookie.value)
+    if (savedEmail === cleanEmail && savedOtp === cleanOtp) {
+      cookieStore.delete('humppl_temp_otp')
+      
+      cookieStore.set('humppl_session', 'authenticated', {
+        path: '/',
+        maxAge: 60 * 60 * 24 * 7, // 1 week
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+      })
+      return { success: true }
+    }
+  } catch (e) {
+    // fallback
+  }
+  
+  return { error: "Incorrect OTP. Please check the code and try again." }
 }
 
 export async function logoutAction() {
