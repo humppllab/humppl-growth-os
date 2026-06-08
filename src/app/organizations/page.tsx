@@ -3,8 +3,10 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/Button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/Table";
-import { Plus, MoreHorizontal, X, Loader2, Search, SlidersHorizontal } from "lucide-react";
+import { Plus, MoreHorizontal, X, Loader2, Search, SlidersHorizontal, Trash2, RefreshCw, Tag, FileText, Layers, Upload, Download, Printer } from "lucide-react";
+import Link from "next/link";
 import { getOrganizations, createOrganization } from "@/actions";
+import { ThreeDotMenu, ThreeDotMenuItemProps } from "@/components/ui/ThreeDotMenu";
 
 interface Organization {
   id: number;
@@ -138,6 +140,22 @@ export default function OrganizationsPage() {
           >
             <SlidersHorizontal className="mr-2 h-4 w-4 text-gray-500" /> Filter
           </Button>
+
+          {/* Three Dot Menu */}
+          <ThreeDotMenu
+            items={[
+              { label: "Mass Delete", href: "/organizations/mass-delete", icon: <Trash2 className="h-4 w-4" />, variant: "destructive" },
+              { label: "Mass Update", href: "/organizations/mass-update", icon: <RefreshCw className="h-4 w-4" /> },
+              { label: "Manage Tags", href: "/organizations/manage-tags", icon: <Tag className="h-4 w-4" /> },
+              { label: "Drafts", href: "/organizations/drafts", icon: <FileText className="h-4 w-4" /> },
+              { label: "Deduplicate", href: "/organizations/deduplicate", icon: <Layers className="h-4 w-4" /> },
+              { divider: true } as ThreeDotMenuItemProps,
+              { label: "Import", href: "/organizations/import", icon: <Upload className="h-4 w-4" /> },
+              { label: "Export", href: "/organizations/export", icon: <Download className="h-4 w-4" /> },
+              { label: "Print View", href: "/organizations/print-view", icon: <Printer className="h-4 w-4" /> },
+            ]}
+          />
+
           <Button onClick={() => setIsModalOpen(true)}>
             <Plus className="mr-2 h-4 w-4" /> Add Organization
           </Button>

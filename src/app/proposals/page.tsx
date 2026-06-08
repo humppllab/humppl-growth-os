@@ -4,10 +4,11 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/Button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/Table";
 import { Badge } from "@/components/ui/Badge";
-import { Plus, MoreHorizontal, FileText, X, Loader2, Search, SlidersHorizontal } from "lucide-react";
+import { Plus, MoreHorizontal, FileText, X, Loader2, Search, SlidersHorizontal, Trash2, RefreshCw, Tag, Layers, Upload, Download, Printer } from "lucide-react";
 import { getProposals, createProposal, getOrganizations } from "@/actions";
 import { formatRupees } from "@/lib/utils";
 import EmailComposerButton from "@/components/ui/EmailComposerButton";
+import { ThreeDotMenu, ThreeDotMenuItemProps } from "@/components/ui/ThreeDotMenu";
 
 interface Organization {
   id: number;
@@ -210,6 +211,22 @@ export default function ProposalsPage() {
           >
             <SlidersHorizontal className="mr-2 h-4 w-4 text-gray-500" /> Filter
           </Button>
+
+          {/* Three Dot Menu */}
+          <ThreeDotMenu
+            items={[
+              { label: "Mass Delete", href: "/proposals/mass-delete", icon: <Trash2 className="h-4 w-4" />, variant: "destructive" },
+              { label: "Mass Update", href: "/proposals/mass-update", icon: <RefreshCw className="h-4 w-4" /> },
+              { label: "Manage Tags", href: "/proposals/manage-tags", icon: <Tag className="h-4 w-4" /> },
+              { label: "Drafts", href: "/proposals/drafts", icon: <FileText className="h-4 w-4" /> },
+              { label: "Deduplicate", href: "/proposals/deduplicate", icon: <Layers className="h-4 w-4" /> },
+              { divider: true } as ThreeDotMenuItemProps,
+              { label: "Import", href: "/proposals/import", icon: <Upload className="h-4 w-4" /> },
+              { label: "Export", href: "/proposals/export", icon: <Download className="h-4 w-4" /> },
+              { label: "Print View", href: "/proposals/print-view", icon: <Printer className="h-4 w-4" /> },
+            ]}
+          />
+
           <Button onClick={() => setIsModalOpen(true)}>
             <Plus className="mr-2 h-4 w-4" /> Create Proposal
           </Button>

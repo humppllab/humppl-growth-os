@@ -3,9 +3,10 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/Button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/Table";
-import { Plus, MoreHorizontal, FileText, Link as LinkIcon, FileImage, X, Loader2 } from "lucide-react";
+import { Plus, MoreHorizontal, FileText, Link as LinkIcon, FileImage, X, Loader2, Trash2, RefreshCw, Tag, Layers, Upload, Download, Printer, SlidersHorizontal } from "lucide-react";
 import { getDocuments, createDocument, getOrganizations } from "@/actions";
 import EmailComposerButton from "@/components/ui/EmailComposerButton";
+import { ThreeDotMenu, ThreeDotMenuItemProps } from "@/components/ui/ThreeDotMenu";
 
 interface Organization {
   id: number;
@@ -131,6 +132,22 @@ export default function DocumentsPage() {
         </div>
         <div className="flex items-center gap-3">
           <EmailComposerButton />
+
+          {/* Three Dot Menu */}
+          <ThreeDotMenu
+            items={[
+              { label: "Mass Delete", href: "/documents/mass-delete", icon: <Trash2 className="h-4 w-4" />, variant: "destructive" },
+              { label: "Mass Update", href: "/documents/mass-update", icon: <RefreshCw className="h-4 w-4" /> },
+              { label: "Manage Tags", href: "/documents/manage-tags", icon: <Tag className="h-4 w-4" /> },
+              { label: "Drafts", href: "/documents/drafts", icon: <FileText className="h-4 w-4" /> },
+              { label: "Deduplicate", href: "/documents/deduplicate", icon: <Layers className="h-4 w-4" /> },
+              { divider: true } as ThreeDotMenuItemProps,
+              { label: "Import", href: "/documents/import", icon: <Upload className="h-4 w-4" /> },
+              { label: "Export", href: "/documents/export", icon: <Download className="h-4 w-4" /> },
+              { label: "Print View", href: "/documents/print-view", icon: <Printer className="h-4 w-4" /> },
+            ]}
+          />
+
           <Button onClick={() => setIsModalOpen(true)}>
             <Plus className="mr-2 h-4 w-4" /> Upload Document
           </Button>

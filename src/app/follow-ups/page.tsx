@@ -4,9 +4,10 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/Button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/Table";
 import { Badge } from "@/components/ui/Badge";
-import { Plus, MoreHorizontal, X, Loader2, Search, SlidersHorizontal } from "lucide-react";
+import { Plus, MoreHorizontal, X, Loader2, Search, SlidersHorizontal, Trash2, RefreshCw, Tag, FileText, Layers, Upload, Download, Printer } from "lucide-react";
 import { getFollowUps, createFollowUp, getOrganizations, toggleFollowUpStatus } from "@/actions";
 import EmailComposerButton from "@/components/ui/EmailComposerButton";
+import { ThreeDotMenu, ThreeDotMenuItemProps } from "@/components/ui/ThreeDotMenu";
 
 interface Organization {
   id: number;
@@ -211,6 +212,22 @@ export default function FollowUpsPage() {
           >
             <SlidersHorizontal className="mr-2 h-4 w-4 text-gray-500" /> Filter
           </Button>
+
+          {/* Three Dot Menu */}
+          <ThreeDotMenu
+            items={[
+              { label: "Mass Delete", href: "/follow-ups/mass-delete", icon: <Trash2 className="h-4 w-4" />, variant: "destructive" },
+              { label: "Mass Update", href: "/follow-ups/mass-update", icon: <RefreshCw className="h-4 w-4" /> },
+              { label: "Manage Tags", href: "/follow-ups/manage-tags", icon: <Tag className="h-4 w-4" /> },
+              { label: "Drafts", href: "/follow-ups/drafts", icon: <FileText className="h-4 w-4" /> },
+              { label: "Deduplicate", href: "/follow-ups/deduplicate", icon: <Layers className="h-4 w-4" /> },
+              { divider: true } as ThreeDotMenuItemProps,
+              { label: "Import", href: "/follow-ups/import", icon: <Upload className="h-4 w-4" /> },
+              { label: "Export", href: "/follow-ups/export", icon: <Download className="h-4 w-4" /> },
+              { label: "Print View", href: "/follow-ups/print-view", icon: <Printer className="h-4 w-4" /> },
+            ]}
+          />
+
           <Button onClick={() => setIsModalOpen(true)}>
             <Plus className="mr-2 h-4 w-4" /> Add Follow-up
           </Button>

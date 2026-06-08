@@ -118,7 +118,7 @@ export default function PipelinePage() {
     try {
       await createMeeting(meetingTitle, orgId, meetingDateTime);
       setSelectedDealForMeeting(null);
-      alert("Meeting scheduled successfully!");
+      setMeetingError("Meeting scheduled successfully.");
     } catch (err: any) {
       console.error(err);
       setMeetingError(err.message || "Failed to schedule meeting.");

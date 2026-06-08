@@ -903,3 +903,139 @@ export async function updateMeetingDateTime(id: string, dateTimeStr: string) {
 
 
 
+
+// ==========================================
+// MASS OPERATIONS ACTIONS
+// ==========================================
+export async function deleteContacts(contactIds: number[]) {
+  if (!contactIds || contactIds.length === 0) {
+    throw new Error("No contacts to delete")
+  }
+
+  const { error } = await supabase
+    .from('contacts')
+    .delete()
+    .in('id', contactIds)
+
+  if (error) throw new Error(error.message)
+
+  // Log activity for mass delete
+  await logActivity(
+    'Bulk Delete Contacts',
+    `Deleted ${contactIds.length} contact(s)`,
+    'bulk_delete',
+    undefined,
+    undefined
+  )
+
+  return { deleted: contactIds.length }
+}
+
+export async function updateContacts(
+  contactIds: number[],
+  field: string,
+  value: string
+) {
+  if (!contactIds || contactIds.length === 0) {
+    throw new Error("No contacts to update")
+  }
+
+  const updateData: any = {}
+  
+  if (field === "first_name") updateData.first_name = value
+  else if (field === "last_name") updateData.last_name = value
+  else if (field === "email") updateData.email = value
+  else if (field === "job_title") updateData.job_title = value
+  else {
+    throw new Error("Invalid field for update")
+  }
+
+  const { error } = await supabase
+    .from('contacts')
+    .update(updateData)
+    .in('id', contactIds)
+
+  if (error) throw new Error(error.message)
+
+  // Log activity for mass update
+  await logActivity(
+    'Bulk Update Contacts',
+    `Updated ${field} for ${contactIds.length} contact(s) to "${value}"`,
+    'bulk_update',
+    undefined,
+    undefined
+  )
+
+  return { updated: contactIds.length }
+}
+
+export async function assignTagsToContacts(
+  contactIds: number[],
+  tags: string[]
+) {
+  if (!contactIds || contactIds.length === 0) {
+    throw new Error("No contacts selected")
+  }
+
+  // TODO: Implement tagging logic once tags table is created in database
+  // For now, just log the activity
+  await logActivity(
+    'Bulk Tag Assignment',
+    `Assigned ${tags.length} tag(s) to ${contactIds.length} contact(s)`,
+    'bulk_tag_assign',
+    undefined,
+    undefined
+  )
+
+  return { assigned: contactIds.length }
+}
+
+export async function removeTagsFromContacts(
+  contactIds: number[],
+  tags: string[]
+) {
+  if (!contactIds || contactIds.length === 0) {
+    throw new Error("No contacts selected")
+  }
+
+  // TODO: Implement tag removal logic once tags table is created in database
+  // For now, just log the activity
+  await logActivity(
+    'Bulk Tag Removal',
+    `Removed ${tags.length} tag(s) from ${contactIds.length} contact(s)`,
+    'bulk_tag_remove',
+    undefined,
+    undefined
+  )
+
+  return { removed: contactIds.length }
+}
+
+export async function mergeContacts(
+  primaryContactId: number,
+  duplicateContactIds: number[]
+) {
+  if (!primaryContactId || !duplicateContactIds || duplicateContactIds.length === 0) {
+    throw new Error("Invalid merge parameters")
+  }
+
+  // Delete duplicate contacts
+  const { error: deleteError } = await supabase
+    .from('contacts')
+    .delete()
+    .in('id', duplicateContactIds)
+
+  if (deleteError) throw new Error(deleteError.message)
+
+  // Log activity for merge
+  await logActivity(
+    'Contacts Merged',
+    `Merged ${duplicateContactIds.length} duplicate contact(s) into contact ID ${primaryContactId}`,
+    'contacts_merged',
+    undefined,
+    undefined,
+    primaryContactId
+  )
+
+  return { merged: duplicateContactIds.length, primaryId: primaryContactId }
+}

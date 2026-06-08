@@ -4,8 +4,9 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/Button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/Table";
 import { Badge } from "@/components/ui/Badge";
-import { Plus, Calendar as CalendarIcon, X, Loader2, Search, SlidersHorizontal } from "lucide-react";
+import { Plus, Calendar as CalendarIcon, X, Loader2, Search, SlidersHorizontal, Trash2, RefreshCw, Tag, FileText, Layers, Upload, Download, Printer } from "lucide-react";
 import { getMeetings, createMeeting, getOrganizations, updateMeetingDateTime } from "@/actions";
+import { ThreeDotMenu, ThreeDotMenuItemProps } from "@/components/ui/ThreeDotMenu";
 
 interface Organization {
   id: number;
@@ -126,7 +127,7 @@ export default function MeetingsPage() {
       if (updated) {
         setMeetings(meetings.map(m => m.id === selectedMeetingForReschedule.id ? { ...m, date_time: rescheduleDateTime } : m).sort((a, b) => new Date(a.date_time).getTime() - new Date(b.date_time).getTime()));
         setSelectedMeetingForReschedule(null);
-        alert("Meeting rescheduled successfully!");
+        setError("Meeting rescheduled successfully.");
       }
     } catch (err: any) {
       console.error(err);

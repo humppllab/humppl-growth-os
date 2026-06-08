@@ -14,7 +14,7 @@ export default function ExportCsvButton() {
       const opps = await getOpportunities()
       
       if (!opps || opps.length === 0) {
-        alert("No opportunity data found to export.")
+        console.warn("No opportunity data found to export.")
         setExporting(false)
         return
       }
@@ -71,7 +71,6 @@ export default function ExportCsvButton() {
       document.body.removeChild(link)
     } catch (err) {
       console.error("CSV Export failed:", err)
-      alert("Failed to export CSV. Please check console logs.")
     } finally {
       setExporting(false)
     }
