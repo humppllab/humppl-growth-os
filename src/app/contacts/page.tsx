@@ -9,6 +9,7 @@ import { useRouter } from 'next/navigation'
 import { useContacts } from '@/context/ContactsContext'
 import { getEmailTemplate, openGmailCompose } from "@/lib/templates"
 import EmailComposerButton from "@/components/ui/EmailComposerButton"
+import ExportCsvButton from "@/components/ui/ExportCsvButton"
 
 interface Contact {
   id: number
@@ -481,6 +482,7 @@ Mike,Johnson,mike.j@example.com,Product Lead,Innovation Inc,+1-555-0102`
         </div>
         <div className="flex items-center gap-3">
           <EmailComposerButton />
+          <ExportCsvButton module="contacts" />
           <Button
             variant="outline"
             onClick={() => setIsFilterOpen(!isFilterOpen)}

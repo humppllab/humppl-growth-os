@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/Button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/Table";
 import { Plus, MoreHorizontal, X, Loader2, Search, SlidersHorizontal } from "lucide-react";
 import { getOrganizations, createOrganization } from "@/actions";
+import ExportCsvButton from "@/components/ui/ExportCsvButton";
+import Link from "next/link";
 
 interface Organization {
   id: number;
@@ -98,10 +100,9 @@ export default function OrganizationsPage() {
       org.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (org.industry || "").toLowerCase().includes(searchQuery.toLowerCase());
 
-    const matchesIndustry = !filterIndustry || 
-      (org.industry || "").toLowerCase().includes(filterIndustry.toLowerCase());
+    const matchesFilterIndustry = !filterIndustry || org.industry === filterIndustry;
 
-    return matchesSearch && matchesIndustry;
+    return matchesSearch && matchesFilterIndustry;
   });
 
   // Local sorting
@@ -131,6 +132,7 @@ export default function OrganizationsPage() {
           <p className="text-sm text-gray-500 mt-1">Manage your client organizations and companies.</p>
         </div>
         <div className="flex items-center gap-3">
+          <ExportCsvButton module="organizations" />
           <Button 
             variant="outline" 
             onClick={() => setIsFilterOpen(!isFilterOpen)}
@@ -248,7 +250,11 @@ export default function OrganizationsPage() {
                             className="h-3.5 w-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500/20"
                           />
                         </TableCell>
-                        <TableCell className="font-medium text-gray-900">{org.name}</TableCell>
+                        <TableCell className="font-medium text-blue-600">
+                          <Link href={`/organizations/${org.id}`} className="hover:underline">
+                            {org.name}
+                          </Link>
+                        </TableCell>
                         <TableCell>{org.industry || '--'}</TableCell>
                         <TableCell>
                           {org.website_url ? (

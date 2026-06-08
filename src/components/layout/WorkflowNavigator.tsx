@@ -8,6 +8,8 @@ const workflowSteps = [
   { name: 'Dashboard', path: '/', tip: 'Explore aggregate client health metrics, won deals, and scheduled meetings.' },
   { name: 'Organizations', path: '/organizations', tip: 'Start by creating client companies and registering their industry/website details.' },
   { name: 'Contacts', path: '/contacts', tip: 'Add individual stakeholders, decision-makers, and CHROs to your organizations.' },
+  { name: 'Campaigns', path: '/campaigns', tip: 'Plan and run email campaigns to engage HR heads, CHROs, and campus placement coordinators.' },
+  { name: 'Leads', path: '/leads', tip: 'Manage inbound marketing responses and qualify prospects before opportunity conversion.' },
   { name: 'Opportunities', path: '/opportunities', tip: 'Track active consulting, CHRO, or campus deals. Assign an owner and estimate value.' },
   { name: 'Pipeline Stages', path: '/pipeline', tip: 'Drag and drop your active deals across stages, from lead to negotiation and victory.' },
   { name: 'Meetings', path: '/meetings', tip: 'Schedule discover calls or kickoff sessions to keep deals warm and record timeline notes.' },
@@ -16,6 +18,7 @@ const workflowSteps = [
   { name: 'Approvals', path: '/approvals', tip: 'Request reviews for commercial terms, and approve or reject submissions.' },
   { name: 'Documents', path: '/documents', tip: 'Share and reference Google Drive links, presentation decks, or signed agreements.' },
   { name: 'Onboarding', path: '/onboarding', tip: 'Kick off delivery checklists for won accounts. Mark off scopes and kickoff terms.' },
+  { name: 'Tickets', path: '/tickets', tip: 'Track post-onboarding client issues, service requests, and SLA response times.' },
   { name: 'Settings', path: '/settings', tip: 'Review your account workspace, profile settings, and internal company info.' }
 ]
 

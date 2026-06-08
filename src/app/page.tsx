@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
-import { Building2, Users, Briefcase, Calendar, CheckSquare, Trophy, ArrowRight } from "lucide-react";
+import { Building2, Users, Briefcase, Calendar, CheckSquare, Trophy, ArrowRight, Target, Megaphone, LifeBuoy } from "lucide-react";
 import Link from "next/link";
 import { getDashboardMetrics } from "@/actions";
 import ExportCsvButton from "@/components/ui/ExportCsvButton";
@@ -18,6 +18,9 @@ export default async function Dashboard() {
       meetingsToday: 0,
       pendingApprovals: 0,
       wonDeals: 0,
+      totalLeads: 0,
+      activeCampaigns: 0,
+      openTickets: 0,
       pipelineSummary: [
         { stage: "Discovery Done", count: 0, value: "₹0", color: "bg-blue-500" },
         { stage: "Proposal Sent", count: 0, value: "₹0", color: "bg-indigo-500" },
@@ -33,9 +36,12 @@ export default async function Dashboard() {
   const metrics = [
     { title: "Total Organizations", value: stats.totalOrganizations.toString(), icon: Building2, color: "text-blue-600", bg: "bg-blue-100" },
     { title: "Total Contacts", value: stats.totalContacts.toString(), icon: Users, color: "text-indigo-600", bg: "bg-indigo-100" },
+    { title: "Active Leads", value: (stats.totalLeads || 0).toString(), icon: Target, color: "text-emerald-600", bg: "bg-emerald-100" },
     { title: "Active Opportunities", value: stats.activeOpportunities.toString(), icon: Briefcase, color: "text-amber-600", bg: "bg-amber-100" },
-    { title: "Meetings Today", value: stats.meetingsToday.toString(), icon: Calendar, color: "text-emerald-600", bg: "bg-emerald-100" },
+    { title: "Meetings Today", value: stats.meetingsToday.toString(), icon: Calendar, color: "text-blue-600", bg: "bg-blue-100" },
     { title: "Pending Approvals", value: stats.pendingApprovals.toString(), icon: CheckSquare, color: "text-rose-600", bg: "bg-rose-100" },
+    { title: "Active Campaigns", value: (stats.activeCampaigns || 0).toString(), icon: Megaphone, color: "text-pink-600", bg: "bg-pink-100" },
+    { title: "Open Support Tickets", value: (stats.openTickets || 0).toString(), icon: LifeBuoy, color: "text-orange-600", bg: "bg-orange-100" },
     { title: "Won Deals", value: stats.wonDeals.toString(), icon: Trophy, color: "text-purple-600", bg: "bg-purple-100" },
   ];
 

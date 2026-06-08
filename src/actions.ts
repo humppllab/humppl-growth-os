@@ -100,6 +100,17 @@ export async function createOrganization(name: string, industry: string, website
   return data ? data[0] : null
 }
 
+export async function getOrganizationDetail(id: number) {
+  const supabase = await getSupabaseClient()
+  const { data, error } = await supabase
+    .from('organizations')
+    .select('*, contacts(*), opportunities(*), followups(*), tickets(*), onboarding_checklists(*)')
+    .eq('id', id)
+    .single()
+  if (error) throw new Error(error.message)
+  return data
+}
+
 // ==========================================
 // CONTACTS ACTIONS
 // ==========================================
@@ -477,6 +488,57 @@ export async function getProposals() {
   return data || []
 }
 
+export async function getProposalDetail(id: string) {
+  const supabase = await getSupabaseClient()
+  const { data, error } = await supabase
+    .from('proposals')
+    .select('*, organizations(id, name), pricing_items(*), approval_requests(*)')
+    .eq('id', id)
+    .single()
+  if (error) throw new Error(error.message)
+  return data
+}
+
+export async function createPricingItem(item: {
+  proposal_id: string
+  name: string
+  description?: string
+  quantity: number
+  rate: number
+  discount: number
+  total: number
+}) {
+  const supabase = await getSupabaseClient()
+  const { data, error } = await supabase
+    .from('pricing_items')
+    .insert([item])
+    .select()
+  if (error) throw new Error(error.message)
+  return data ? data[0] : null
+}
+
+export async function deletePricingItem(id: number) {
+  const supabase = await getSupabaseClient()
+  const { data, error } = await supabase
+    .from('pricing_items')
+    .delete()
+    .eq('id', id)
+    .select()
+  if (error) throw new Error(error.message)
+  return data ? data[0] : null
+}
+
+export async function updateProposalValue(id: string, value: number) {
+  const supabase = await getSupabaseClient()
+  const { data, error } = await supabase
+    .from('proposals')
+    .update({ value })
+    .eq('id', id)
+    .select()
+  if (error) throw new Error(error.message)
+  return data ? data[0] : null
+}
+
 export async function createProposal(
   title: string,
   organizationId: number,
@@ -804,14 +866,20 @@ export async function getDashboardMetrics() {
     { data: opportunities },
     { data: meetings },
     { data: approvals },
-    { data: recentActivities }
+    { data: recentActivities },
+    { count: leadsCount },
+    { count: activeCampaignsCount },
+    { count: openTicketsCount }
   ] = await Promise.all([
     supabase.from('organizations').select('*', { count: 'exact', head: true }).eq('archived', false),
     supabase.from('contacts').select('*', { count: 'exact', head: true }).eq('archived', false),
     supabase.from('opportunities').select('stage, value').eq('archived', false),
     supabase.from('meetings').select('id, date_time'),
     supabase.from('approval_requests').select('id, status'),
-    supabase.from('activity_logs').select('*').order('created_at', { ascending: false }).limit(6)
+    supabase.from('activity_logs').select('*').order('created_at', { ascending: false }).limit(6),
+    supabase.from('leads').select('*', { count: 'exact', head: true }).eq('converted', false).eq('archived', false),
+    supabase.from('campaigns').select('*', { count: 'exact', head: true }).eq('status', 'Active'),
+    supabase.from('tickets').select('*', { count: 'exact', head: true }).neq('status', 'Resolved')
   ])
 
   const activeOpps = (opportunities || []).filter(opp => 
@@ -874,7 +942,10 @@ export async function getDashboardMetrics() {
     pendingApprovals,
     wonDeals,
     pipelineSummary,
-    recentActivities: formattedActivities
+    recentActivities: formattedActivities,
+    totalLeads: leadsCount || 0,
+    activeCampaigns: activeCampaignsCount || 0,
+    openTickets: openTicketsCount || 0
   }
 }
 
@@ -1079,11 +1150,28 @@ export async function getCampaigns() {
   return data || []
 }
 
-export async function createCampaign(title: string, objective: string, status: string = 'Planned') {
+export async function getCampaignDetail(id: string) {
   const supabase = await getSupabaseClient()
   const { data, error } = await supabase
     .from('campaigns')
-    .insert([{ title, objective, status }])
+    .select('*')
+    .eq('id', id)
+    .single()
+  if (error) throw new Error(error.message)
+  return data
+}
+
+export async function createCampaign(
+  title: string, 
+  objective: string, 
+  status: string = 'Planned',
+  audienceSegment: string = 'All Contacts',
+  owner: string = 'humppllab@humppl.com'
+) {
+  const supabase = await getSupabaseClient()
+  const { data, error } = await supabase
+    .from('campaigns')
+    .insert([{ title, objective, status, audience_segment: audienceSegment, owner }])
     .select()
   if (error) throw new Error(error.message)
   return data ? data[0] : null
@@ -1139,6 +1227,17 @@ export async function getTickets() {
     .order('created_at', { ascending: false })
   if (error) throw new Error(error.message)
   return data || []
+}
+
+export async function getTicketDetail(id: string) {
+  const supabase = await getSupabaseClient()
+  const { data, error } = await supabase
+    .from('tickets')
+    .select('*, organizations(name)')
+    .eq('id', id)
+    .single()
+  if (error) throw new Error(error.message)
+  return data
 }
 
 export async function createTicket(
@@ -1342,4 +1441,264 @@ export async function getTicketsCsvData() {
   if (error) throw new Error(error.message)
   return data || []
 }
+
+// ==========================================
+// LEADS ACTIONS
+// ==========================================
+export async function getLeads() {
+  const supabase = await getSupabaseClient()
+  const { data, error } = await supabase
+    .from('leads')
+    .select('*')
+    .eq('archived', false)
+    .order('created_at', { ascending: false })
+  if (error) throw new Error(error.message)
+  return data || []
+}
+
+export async function getLeadDetail(id: number) {
+  const supabase = await getSupabaseClient()
+  const { data, error } = await supabase
+    .from('leads')
+    .select('*')
+    .eq('id', id)
+    .single()
+  if (error) throw new Error(error.message)
+  return data
+}
+
+export async function createLead(lead: {
+  first_name: string
+  last_name: string
+  email: string
+  phone?: string
+  mobile?: string
+  job_title?: string
+  organization_name: string
+  source?: string
+  campaign_source?: string
+  referral_source?: string
+  lead_quality?: 'High' | 'Medium' | 'Low'
+  priority_score?: number
+  owner?: string
+  qualification_status?: 'Raw' | 'Contacted' | 'Qualified' | 'Nurture' | 'Disqualified'
+}) {
+  const supabase = await getSupabaseClient()
+  const { data, error } = await supabase
+    .from('leads')
+    .insert([lead])
+    .select()
+  if (error) throw new Error(error.message)
+
+  if (data && data[0]) {
+    await logActivity(
+      'Lead Captured',
+      `New Lead: ${lead.first_name} ${lead.last_name} from ${lead.organization_name}`,
+      'lead_created',
+      undefined,
+      undefined,
+      undefined
+    )
+  }
+  return data ? data[0] : null
+}
+
+export async function updateLead(
+  id: number,
+  lead: Partial<{
+    first_name: string
+    last_name: string
+    email: string
+    phone: string
+    mobile: string
+    job_title: string
+    organization_name: string
+    source: string
+    campaign_source: string
+    referral_source: string
+    lead_quality: 'High' | 'Medium' | 'Low'
+    priority_score: number
+    owner: string
+    qualification_status: 'Raw' | 'Contacted' | 'Qualified' | 'Nurture' | 'Disqualified'
+    archived: boolean
+  }>
+) {
+  const supabase = await getSupabaseClient()
+  const { data, error } = await supabase
+    .from('leads')
+    .update(lead)
+    .eq('id', id)
+    .select()
+  if (error) throw new Error(error.message)
+  return data ? data[0] : null
+}
+
+export async function convertLeadToOpportunity(leadId: number, oppName: string, oppValue: number, oppOwner: string) {
+  const supabase = await getSupabaseClient()
+  
+  // 1. Get lead
+  const { data: lead, error: leadErr } = await supabase
+    .from('leads')
+    .select('*')
+    .eq('id', leadId)
+    .single()
+  if (leadErr) throw new Error(leadErr.message)
+  if (lead.converted) throw new Error("Lead is already converted.")
+
+  // 2. Create / Get Organization
+  let orgId: number
+  const { data: existingOrgs, error: findError } = await supabase
+    .from('organizations')
+    .select('id')
+    .eq('name', lead.organization_name)
+    .limit(1)
+
+  if (findError) throw new Error(findError.message)
+
+  if (existingOrgs && existingOrgs.length > 0) {
+    orgId = existingOrgs[0].id
+  } else {
+    const { data: newOrg, error: orgError } = await supabase
+      .from('organizations')
+      .insert([{ name: lead.organization_name, industry: 'Other', status: 'prospect' }])
+      .select()
+    if (orgError) throw new Error(orgError.message)
+    orgId = newOrg[0].id
+  }
+
+  // 3. Create Contact
+  const { data: newContact, error: contactError } = await supabase
+    .from('contacts')
+    .insert([{
+      first_name: lead.first_name || 'N/A',
+      last_name: lead.last_name || 'N/A',
+      email: lead.email || 'N/A',
+      phone: lead.phone,
+      mobile: lead.mobile,
+      job_title: lead.job_title,
+      organization_id: orgId,
+      contact_type: 'decision maker'
+    }])
+    .select()
+
+  if (contactError) throw new Error(contactError.message)
+  const contact = newContact[0]
+
+  // 4. Create Opportunity
+  const { data: newOpp, error: oppError } = await supabase
+    .from('opportunities')
+    .insert([{
+      name: oppName || `Opportunity - ${lead.organization_name}`,
+      organization_id: orgId,
+      type: 'HR Consulting',
+      stage: 'Qualified',
+      value: oppValue || 0,
+      owner: oppOwner || lead.owner || 'System',
+      primary_contact_id: contact.id
+    }])
+    .select()
+
+  if (oppError) throw new Error(oppError.message)
+  const opp = newOpp[0]
+
+  // 5. Update Lead as Converted
+  const { error: updateLeadErr } = await supabase
+    .from('leads')
+    .update({ converted: true, qualification_status: 'Qualified' })
+    .eq('id', leadId)
+  if (updateLeadErr) throw new Error(updateLeadErr.message)
+
+  // 6. Log Activity
+  await logActivity(
+    'Lead Converted',
+    `Converted lead ${lead.first_name} ${lead.last_name} into Opportunity: ${opp.name}`,
+    'lead_converted',
+    opp.id,
+    orgId,
+    contact.id
+  )
+
+  return { organizationId: orgId, contactId: contact.id, opportunityId: opp.id }
+}
+
+// ==========================================
+// PIPELINE STAGES ACTIONS
+// ==========================================
+export async function getPipelineStages() {
+  const supabase = await getSupabaseClient()
+  const { data, error } = await supabase
+    .from('pipeline_stages')
+    .select('*')
+    .order('sort_order', { ascending: true })
+  if (error) throw new Error(error.message)
+  return data || []
+}
+
+export async function createPipelineStage(name: string, probability: number, sortOrder: number) {
+  const supabase = await getSupabaseClient()
+  const { data, error } = await supabase
+    .from('pipeline_stages')
+    .insert([{ name, probability, sort_order: sortOrder }])
+    .select()
+  if (error) throw new Error(error.message)
+  return data ? data[0] : null
+}
+
+export async function updatePipelineStage(id: number, name: string, probability: number, sortOrder: number) {
+  const supabase = await getSupabaseClient()
+  const { data, error } = await supabase
+    .from('pipeline_stages')
+    .update({ name, probability, sort_order: sortOrder })
+    .eq('id', id)
+    .select()
+  if (error) throw new Error(error.message)
+  return data ? data[0] : null
+}
+
+export async function deletePipelineStage(id: number) {
+  const supabase = await getSupabaseClient()
+  const { data, error } = await supabase
+    .from('pipeline_stages')
+    .delete()
+    .eq('id', id)
+    .select()
+  if (error) throw new Error(error.message)
+  return data ? data[0] : null
+}
+
+// ==========================================
+// TEAM / PROFILE LIST ACTIONS
+// ==========================================
+export async function getProfiles() {
+  const supabase = await getSupabaseClient()
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .order('created_at', { ascending: false })
+  if (error) throw new Error(error.message)
+  return data || []
+}
+
+export async function updateProfileRole(id: string, role: string, active: boolean = true) {
+  const supabase = await getSupabaseClient()
+  const { data, error } = await supabase
+    .from('profiles')
+    .update({ role, active })
+    .eq('id', id)
+    .select()
+  if (error) throw new Error(error.message)
+  return data ? data[0] : null
+}
+
+export async function getLeadsCsvData() {
+  const supabase = await getSupabaseClient()
+  const { data, error } = await supabase
+    .from('leads')
+    .select('first_name, last_name, email, phone, mobile, job_title, organization_name, source, campaign_source, referral_source, lead_quality, priority_score, owner, qualification_status, converted')
+    .eq('archived', false)
+    .order('created_at', { ascending: false })
+  if (error) throw new Error(error.message)
+  return data || []
+}
+
 

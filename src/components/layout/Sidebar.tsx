@@ -13,19 +13,26 @@ import {
   CheckSquare, 
   Files, 
   UserPlus, 
-  Settings 
+  Settings,
+  Target,
+  Megaphone,
+  LifeBuoy
 } from 'lucide-react';
 
 const navItems = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
+  { name: 'Organizations', href: '/organizations', icon: Building2 },
   { name: 'Contacts', href: '/contacts', icon: Users },
+  { name: 'Leads', href: '/leads', icon: Target },
   { name: 'Pipeline', href: '/pipeline', icon: KanbanSquare },
   { name: 'Meetings', href: '/meetings', icon: Calendar },
   { name: 'Follow-ups', href: '/follow-ups', icon: Clock },
   { name: 'Proposals', href: '/proposals', icon: FileText },
   { name: 'Approvals', href: '/approvals', icon: CheckSquare },
   { name: 'Documents', href: '/documents', icon: Files },
+  { name: 'Campaigns', href: '/campaigns', icon: Megaphone },
   { name: 'Onboarding', href: '/onboarding', icon: UserPlus },
+  { name: 'Tickets', href: '/tickets', icon: LifeBuoy },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];
 

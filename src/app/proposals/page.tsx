@@ -8,6 +8,8 @@ import { Plus, MoreHorizontal, FileText, X, Loader2, Search, SlidersHorizontal }
 import { getProposals, createProposal, getOrganizations } from "@/actions";
 import { formatRupees } from "@/lib/utils";
 import EmailComposerButton from "@/components/ui/EmailComposerButton";
+import ExportCsvButton from "@/components/ui/ExportCsvButton";
+import Link from "next/link";
 
 interface Organization {
   id: number;
@@ -203,6 +205,7 @@ export default function ProposalsPage() {
         </div>
         <div className="flex items-center gap-3">
           <EmailComposerButton />
+          <ExportCsvButton module="proposals" />
           <Button 
             variant="outline" 
             onClick={() => setIsFilterOpen(!isFilterOpen)}
@@ -347,7 +350,9 @@ export default function ProposalsPage() {
                         </TableCell>
                         <TableCell className="font-medium text-blue-600 flex items-center">
                           <FileText className="mr-2 h-4 w-4 text-gray-400 shrink-0" />
-                          {proposal.title}
+                          <Link href={`/proposals/${proposal.id}`} className="hover:underline">
+                            {proposal.title}
+                          </Link>
                         </TableCell>
                         <TableCell>{proposal.organizations?.name || '--'}</TableCell>
                         <TableCell className="font-semibold text-gray-900">{formatRupees(proposal.value)}</TableCell>
