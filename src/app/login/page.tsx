@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/Button"
 import { Card, CardContent } from "@/components/ui/Card"
 import { Loader2, KeyRound, Mail, Sparkles, ArrowRight, ArrowLeft } from "lucide-react"
-import { sendOtpAction, verifyOtpAction } from "@/actions"
+import { sendOtpAction, verifyOtpAction, demoLoginAction } from "@/actions"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -30,9 +30,6 @@ export default function LoginPage() {
         setError(res.error)
       } else if (res.success) {
         setOtpSent(true)
-        if (res.otp) {
-          setDemoOtp(res.otp)
-        }
         setSuccessMessage(`OTP sent successfully to ${email}.`)
       }
     } catch (err: any) {
@@ -70,22 +67,12 @@ export default function LoginPage() {
     setError("")
     setSuccessMessage("")
     try {
-      const emailDemo = "admin@humppl.com"
-      const sendRes = await sendOtpAction(emailDemo)
-      if (sendRes && 'error' in sendRes && sendRes.error) {
-        setError(sendRes.error)
-        setLoading(false)
-        return
-      }
-      
-      if (sendRes.success && sendRes.otp) {
-        const verifyRes = await verifyOtpAction(emailDemo, sendRes.otp)
-        if (verifyRes && 'error' in verifyRes && verifyRes.error) {
-          setError(verifyRes.error)
-        } else if (verifyRes.success) {
-          router.push("/")
-          router.refresh()
-        }
+      const res = await demoLoginAction()
+      if (res && 'error' in res && res.error) {
+        setError(res.error)
+      } else if (res.success) {
+        router.push("/")
+        router.refresh()
       }
     } catch (err: any) {
       console.error(err)

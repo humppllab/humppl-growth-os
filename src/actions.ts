@@ -1,11 +1,29 @@
 'use server'
- 
-import { supabase } from './lib/supabase'
+
+import { createClient } from '@supabase/supabase-js'
 import { formatRupees } from './lib/utils'
 import { cookies } from 'next/headers'
 
 // ==========================================
-// ACTIVITY TIMELINE ACTIONS
+// SUPABASE CLIENT HELPER (SESSION-AWARE)
+// ==========================================
+async function getSupabaseClient() {
+  const cookieStore = await cookies()
+  const token = cookieStore.get('sb-access-token')?.value
+  
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      global: {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      },
+    }
+  )
+}
+
+// ==========================================
+// ACTIVITY LOGS ACTIONS
 // ==========================================
 export async function logActivity(
   title: string,
@@ -15,13 +33,14 @@ export async function logActivity(
   organizationId?: number,
   contactId?: number
 ) {
+  const supabase = await getSupabaseClient()
   const record: any = { title, description, type }
   if (opportunityId) record.opportunity_id = opportunityId
   if (organizationId) record.organization_id = organizationId
   if (contactId) record.contact_id = contactId
 
   const { data, error } = await supabase
-    .from('activity_timeline')
+    .from('activity_logs')
     .insert([record])
     .select()
 
@@ -36,7 +55,8 @@ export async function getActivityTimeline(
   organizationId?: number,
   contactId?: number
 ) {
-  let query = supabase.from('activity_timeline').select('*').order('created_at', { ascending: false })
+  const supabase = await getSupabaseClient()
+  let query = supabase.from('activity_logs').select('*').order('created_at', { ascending: false })
   if (opportunityId) query = query.eq('opportunity_id', opportunityId)
   if (organizationId) query = query.eq('organization_id', organizationId)
   if (contactId) query = query.eq('contact_id', contactId)
@@ -50,15 +70,18 @@ export async function getActivityTimeline(
 // ORGANIZATIONS ACTIONS
 // ==========================================
 export async function getOrganizations() {
+  const supabase = await getSupabaseClient()
   const { data, error } = await supabase
     .from('organizations')
     .select('*')
+    .eq('archived', false)
     .order('created_at', { ascending: false })
   if (error) throw new Error(error.message)
   return data || []
 }
 
 export async function createOrganization(name: string, industry: string, websiteUrl: string) {
+  const supabase = await getSupabaseClient()
   const { data, error } = await supabase
     .from('organizations')
     .insert([{ name, industry, website_url: websiteUrl }])
@@ -81,9 +104,11 @@ export async function createOrganization(name: string, industry: string, website
 // CONTACTS ACTIONS
 // ==========================================
 export async function getContacts() {
+  const supabase = await getSupabaseClient()
   const { data, error } = await supabase
     .from('contacts')
     .select('*, organizations(id, name)')
+    .eq('archived', false)
     .order('created_at', { ascending: false })
   if (error) throw new Error(error.message)
   return data || []
@@ -96,6 +121,7 @@ export async function createContact(
   jobTitle: string,
   organizationId: number
 ) {
+  const supabase = await getSupabaseClient()
   const { data, error } = await supabase
     .from('contacts')
     .insert([{ first_name: firstName, last_name: lastName, email, job_title: jobTitle, organization_id: organizationId }])
@@ -126,6 +152,7 @@ export async function createContactWithOrgOnly(
   noteContent: string,
   createdBy: string
 ) {
+  const supabase = await getSupabaseClient()
   let orgId: number
   const { data: existingOrgs, error: findError } = await supabase
     .from('organizations')
@@ -184,6 +211,7 @@ export async function updateContact(
   createdBy: string,
   modifiedBy: string
 ) {
+  const supabase = await getSupabaseClient()
   let orgId: number
   const { data: existingOrgs, error: findError } = await supabase
     .from('organizations')
@@ -229,9 +257,10 @@ export async function updateContact(
 }
 
 export async function deleteContact(contactId: number) {
+  const supabase = await getSupabaseClient()
   const { data, error } = await supabase
     .from('contacts')
-    .delete()
+    .update({ archived: true })
     .eq('id', contactId)
     .select()
 
@@ -243,9 +272,11 @@ export async function deleteContact(contactId: number) {
 // OPPORTUNITIES ACTIONS
 // ==========================================
 export async function getOpportunities() {
+  const supabase = await getSupabaseClient()
   const { data, error } = await supabase
     .from('opportunities')
     .select('*, organizations(name, contacts(*))')
+    .eq('archived', false)
     .order('created_at', { ascending: false })
   if (error) throw new Error(error.message)
   return data || []
@@ -259,6 +290,7 @@ export async function createOpportunity(
   value: number,
   owner: string
 ) {
+  const supabase = await getSupabaseClient()
   const { data, error } = await supabase
     .from('opportunities')
     .insert([{ name, organization_id: organizationId, type, stage, value, owner }])
@@ -278,6 +310,7 @@ export async function createOpportunity(
 }
 
 export async function updateOpportunityStage(id: string, stage: string) {
+  const supabase = await getSupabaseClient()
   const { data: oppBefore, error: fetchErr } = await supabase
     .from('opportunities')
     .select('stage, name, organization_id')
@@ -302,6 +335,20 @@ export async function updateOpportunityStage(id: string, stage: string) {
       id,
       oppBefore.organization_id
     )
+
+    // Trigger auto-onboarding checklist if stage is Won
+    if (stage === 'Won' || stage === 'SLA Signed') {
+      try {
+        await createOnboarding(oppBefore.organization_id, `Project for ${oppBefore.name}`, [
+          'Agreement Status Check',
+          'Kickoff Timeline Set',
+          'Scope Alignment locked',
+          'Invoice Generated'
+        ], id)
+      } catch (err) {
+        console.error("Auto onboarding checklist generation failed:", err)
+      }
+    }
   }
   return data ? data[0] : null
 }
@@ -310,6 +357,7 @@ export async function updateOpportunityStage(id: string, stage: string) {
 // MEETINGS ACTIONS
 // ==========================================
 export async function getMeetings() {
+  const supabase = await getSupabaseClient()
   const { data, error } = await supabase
     .from('meetings')
     .select('*, organizations(name)')
@@ -324,6 +372,7 @@ export async function createMeeting(
   dateTimeStr: string,
   status: string = 'Scheduled'
 ) {
+  const supabase = await getSupabaseClient()
   const { data, error } = await supabase
     .from('meetings')
     .insert([{ title, organization_id: organizationId, date_time: dateTimeStr, status }])
@@ -342,12 +391,36 @@ export async function createMeeting(
   return data ? data[0] : null
 }
 
+export async function updateMeetingDateTime(id: string, dateTimeStr: string) {
+  const supabase = await getSupabaseClient()
+  const { data, error } = await supabase
+    .from('meetings')
+    .update({ date_time: dateTimeStr })
+    .eq('id', id)
+    .select()
+
+  if (error) throw new Error(error.message)
+
+  if (data && data[0]) {
+    await logActivity(
+      'Meeting Rescheduled',
+      `Rescheduled meeting: "${data[0].title}" to ${new Date(dateTimeStr).toLocaleString()}`,
+      'meeting_scheduled',
+      undefined,
+      data[0].organization_id
+    )
+  }
+
+  return data ? data[0] : null
+}
+
 // ==========================================
 // FOLLOW-UPS ACTIONS
 // ==========================================
 export async function getFollowUps() {
+  const supabase = await getSupabaseClient()
   const { data, error } = await supabase
-    .from('follow_ups')
+    .from('followups')
     .select('*, organizations(name)')
     .order('date', { ascending: true })
   if (error) throw new Error(error.message)
@@ -360,8 +433,9 @@ export async function createFollowUp(
   owner: string,
   status: string = 'Pending'
 ) {
+  const supabase = await getSupabaseClient()
   const { data, error } = await supabase
-    .from('follow_ups')
+    .from('followups')
     .insert([{ organization_id: organizationId, date: dateStr, owner, status }])
     .select()
   if (error) throw new Error(error.message)
@@ -379,9 +453,10 @@ export async function createFollowUp(
 }
 
 export async function toggleFollowUpStatus(id: string, currentStatus: string) {
+  const supabase = await getSupabaseClient()
   const nextStatus = currentStatus === 'Completed' ? 'Pending' : 'Completed'
   const { data, error } = await supabase
-    .from('follow_ups')
+    .from('followups')
     .update({ status: nextStatus })
     .eq('id', id)
     .select()
@@ -390,9 +465,10 @@ export async function toggleFollowUpStatus(id: string, currentStatus: string) {
 }
 
 // ==========================================
-// PROPOSALS ACTIONS
+// PROPOSALS & APPROVALS ACTIONS
 // ==========================================
 export async function getProposals() {
+  const supabase = await getSupabaseClient()
   const { data, error } = await supabase
     .from('proposals')
     .select('*, organizations(name)')
@@ -406,10 +482,14 @@ export async function createProposal(
   organizationId: number,
   value: number,
   status: string = 'Draft',
-  dateSentStr?: string
+  dateSentStr?: string,
+  opportunityId?: string,
+  discountPercentage?: number
 ) {
+  const supabase = await getSupabaseClient()
   const record: any = { title, organization_id: organizationId, value, status }
   if (dateSentStr) record.date_sent = dateSentStr
+  if (opportunityId) record.opportunity_id = opportunityId
 
   const { data, error } = await supabase
     .from('proposals')
@@ -418,23 +498,39 @@ export async function createProposal(
   if (error) throw new Error(error.message)
 
   if (data && data[0]) {
+    const proposal = data[0]
     await logActivity(
       'Proposal Created',
       `Proposal "${title}" created (Value: ${formatRupees(value)})`,
       'proposal_created',
-      undefined,
+      opportunityId,
       organizationId
     )
+
+    // Trigger auto approval if discount is over 15%
+    if (discountPercentage && discountPercentage > 15) {
+      try {
+        await createApproval(
+          `Discount Approval for ${title}`,
+          organizationId,
+          value,
+          'Pending',
+          proposal.id,
+          opportunityId,
+          `Requested discount of ${discountPercentage}% exceeds the 15% threshold.`
+        )
+      } catch (err) {
+        console.error("Auto approval request creation failed:", err)
+      }
+    }
   }
   return data ? data[0] : null
 }
 
-// ==========================================
-// APPROVALS ACTIONS
-// ==========================================
 export async function getApprovals() {
+  const supabase = await getSupabaseClient()
   const { data: approvals, error } = await supabase
-    .from('approvals')
+    .from('approval_requests')
     .select('*')
     .order('created_at', { ascending: false })
   if (error) throw new Error(error.message)
@@ -461,11 +557,15 @@ export async function createApproval(
   title: string,
   organizationId: number,
   value: number,
-  status: string = 'Pending'
+  status: string = 'Pending',
+  proposalId?: string,
+  opportunityId?: string,
+  reason?: string
 ) {
+  const supabase = await getSupabaseClient()
   const { data, error } = await supabase
-    .from('approvals')
-    .insert([{ title, organization_id: organizationId, value, status }])
+    .from('approval_requests')
+    .insert([{ title, organization_id: organizationId, requested_value: value, status, proposal_id: proposalId, opportunity_id: opportunityId, reason }])
     .select()
   if (error) throw new Error(error.message)
 
@@ -474,17 +574,18 @@ export async function createApproval(
       'Approval Requested',
       `Requested approval for "${title}" (Value: ${formatRupees(value)})`,
       'approval_requested',
-      undefined,
+      opportunityId,
       organizationId
     )
   }
   return data ? data[0] : null
 }
 
-export async function updateApprovalStatus(id: string, status: string) {
+export async function updateApprovalStatus(id: string, status: string, notes?: string) {
+  const supabase = await getSupabaseClient()
   const { data, error } = await supabase
-    .from('approvals')
-    .update({ status })
+    .from('approval_requests')
+    .update({ status, decision_notes: notes })
     .eq('id', id)
     .select('*')
   if (error) throw new Error(error.message)
@@ -512,9 +613,14 @@ export async function updateApprovalStatus(id: string, status: string) {
     'Approval Status Updated',
     `Approval for "${result.title}" was ${status}`,
     'approval_status_updated',
-    undefined,
+    approval.opportunity_id,
     result.organization_id
   )
+
+  // Update linked proposal status if approved
+  if (approval.proposal_id && status === 'Approved') {
+    await supabase.from('proposals').update({ status: 'Approved' }).eq('id', approval.proposal_id)
+  }
 
   return result
 }
@@ -523,8 +629,9 @@ export async function updateApprovalStatus(id: string, status: string) {
 // DOCUMENTS ACTIONS
 // ==========================================
 export async function getDocuments() {
+  const supabase = await getSupabaseClient()
   const { data, error } = await supabase
-    .from('documents')
+    .from('documents_shared')
     .select('*, organizations(name)')
     .order('created_at', { ascending: false })
   if (error) throw new Error(error.message)
@@ -536,11 +643,14 @@ export async function createDocument(
   type: string,
   organizationId: number,
   fileUrl?: string,
-  size: string = '--'
+  size: string = '--',
+  opportunityId?: string,
+  proposalId?: string
 ) {
+  const supabase = await getSupabaseClient()
   const { data, error } = await supabase
-    .from('documents')
-    .insert([{ name, type, organization_id: organizationId, file_url: fileUrl, size }])
+    .from('documents_shared')
+    .insert([{ name, type, organization_id: organizationId, file_url: fileUrl, size, opportunity_id: opportunityId, proposal_id: proposalId }])
     .select()
   if (error) throw new Error(error.message)
 
@@ -549,7 +659,7 @@ export async function createDocument(
       'Document Uploaded',
       `Uploaded document "${name}" (${type})`,
       'document_uploaded',
-      undefined,
+      opportunityId,
       organizationId
     )
   }
@@ -560,8 +670,9 @@ export async function createDocument(
 // ONBOARDING ACTIONS
 // ==========================================
 export async function getOnboardingList() {
+  const supabase = await getSupabaseClient()
   const { data, error } = await supabase
-    .from('onboarding')
+    .from('onboarding_checklists')
     .select('*, organizations(name), onboarding_tasks(*)')
     .order('created_at', { ascending: false })
   if (error) throw new Error(error.message)
@@ -571,12 +682,17 @@ export async function getOnboardingList() {
 export async function createOnboarding(
   organizationId: number,
   project: string,
-  tasks: string[] = []
+  tasks: string[] = [],
+  opportunityId?: string
 ) {
+  const supabase = await getSupabaseClient()
+  const record: any = { organization_id: organizationId, project, progress: 0 }
+  if (opportunityId) record.opportunity_id = opportunityId
+
   // Insert onboarding record
   const { data: obData, error: obError } = await supabase
-    .from('onboarding')
-    .insert([{ organization_id: organizationId, project, progress: 0 }])
+    .from('onboarding_checklists')
+    .insert([record])
     .select()
   if (obError) throw new Error(obError.message)
 
@@ -598,7 +714,7 @@ export async function createOnboarding(
       'Client Onboarding Started',
       `Started onboarding for project: "${project}"`,
       'onboarding_started',
-      undefined,
+      opportunityId,
       organizationId
     )
   }
@@ -607,17 +723,17 @@ export async function createOnboarding(
 }
 
 export async function toggleOnboardingTask(taskId: string, currentStatus: boolean) {
+  const supabase = await getSupabaseClient()
   const nextStatus = !currentStatus
   const { data: taskData, error: taskError } = await supabase
     .from('onboarding_tasks')
     .update({ status: nextStatus })
     .eq('id', taskId)
-    .select('*, onboarding(id, progress, organization_id, project)')
+    .select('*, onboarding_checklists(id, progress, organization_id, opportunity_id, project)')
     .single()
 
   if (taskError) throw new Error(taskError.message)
 
-  // Recalculate progress for the parent onboarding record
   const onboardingId = taskData.onboarding_id
   const { data: allTasks, error: fetchTasksError } = await supabase
     .from('onboarding_tasks')
@@ -631,7 +747,7 @@ export async function toggleOnboardingTask(taskId: string, currentStatus: boolea
   const progress = total > 0 ? Math.round((completed / total) * 100) : 0
 
   await supabase
-    .from('onboarding')
+    .from('onboarding_checklists')
     .update({ progress })
     .eq('id', onboardingId)
 
@@ -642,6 +758,7 @@ export async function toggleOnboardingTask(taskId: string, currentStatus: boolea
 // PROFILE ACTIONS
 // ==========================================
 export async function getProfile() {
+  const supabase = await getSupabaseClient()
   const { data, error } = await supabase
     .from('profile_settings')
     .select('*')
@@ -656,6 +773,7 @@ export async function updateProfile(
   email: string,
   companyName: string
 ) {
+  const supabase = await getSupabaseClient()
   const profile = await getProfile()
   if (profile) {
     const { data, error } = await supabase
@@ -679,7 +797,7 @@ export async function updateProfile(
 // DASHBOARD METRICS ACTIONS
 // ==========================================
 export async function getDashboardMetrics() {
-  // Fetch counts from individual tables
+  const supabase = await getSupabaseClient()
   const [
     { count: orgsCount },
     { count: contactsCount },
@@ -688,20 +806,18 @@ export async function getDashboardMetrics() {
     { data: approvals },
     { data: recentActivities }
   ] = await Promise.all([
-    supabase.from('organizations').select('*', { count: 'exact', head: true }),
-    supabase.from('contacts').select('*', { count: 'exact', head: true }),
-    supabase.from('opportunities').select('stage, value'),
+    supabase.from('organizations').select('*', { count: 'exact', head: true }).eq('archived', false),
+    supabase.from('contacts').select('*', { count: 'exact', head: true }).eq('archived', false),
+    supabase.from('opportunities').select('stage, value').eq('archived', false),
     supabase.from('meetings').select('id, date_time'),
-    supabase.from('approvals').select('id, status'),
-    supabase.from('activity_timeline').select('*').order('created_at', { ascending: false }).limit(6)
+    supabase.from('approval_requests').select('id, status'),
+    supabase.from('activity_logs').select('*').order('created_at', { ascending: false }).limit(6)
   ])
 
-  // Count active opportunities (any stage that is not Won, Lost, or Nurture)
   const activeOpps = (opportunities || []).filter(opp => 
     !['Won', 'Lost', 'Nurture'].includes(opp.stage)
   ).length
 
-  // Count meetings today
   const startOfDay = new Date()
   startOfDay.setHours(0, 0, 0, 0)
   const endOfDay = new Date()
@@ -711,21 +827,14 @@ export async function getDashboardMetrics() {
     return d >= startOfDay && d <= endOfDay
   }).length
 
-  // Count pending approvals
   const pendingApprovals = (approvals || []).filter(app => app.status === 'Pending').length
-
-  // Count won deals
   const wonDeals = (opportunities || []).filter(opp => opp.stage === 'Won').length
 
-  // Aggregate pipeline summary by stage
-  // Stages: Discovery Done, Proposal Sent, Negotiation, Approval Pending
   const stagesOfInterest = ['Discovery Done', 'Proposal Sent', 'Negotiation', 'Approval Pending']
   const pipelineSummary = stagesOfInterest.map((stage, idx) => {
     const oppsInStage = (opportunities || []).filter(opp => opp.stage === stage)
     const count = oppsInStage.length
     const totalVal = oppsInStage.reduce((sum, opp) => sum + (Number(opp.value) || 0), 0)
-    
-    // Choose colors to match Aditi's theme
     const colors = ['bg-blue-500', 'bg-indigo-500', 'bg-amber-500', 'bg-rose-500']
     
     return {
@@ -736,7 +845,6 @@ export async function getDashboardMetrics() {
     }
   })
 
-  // Format activity timeline
   const formattedActivities = (recentActivities || []).map(act => {
     const diffMs = Date.now() - new Date(act.created_at).getTime()
     const diffMins = Math.floor(diffMs / 60000)
@@ -778,6 +886,7 @@ export async function getNotes(
   organizationId?: number,
   contactId?: number
 ) {
+  const supabase = await getSupabaseClient()
   let query = supabase.from('notes').select('*').order('created_at', { ascending: false })
   if (opportunityId) query = query.eq('opportunity_id', opportunityId)
   if (organizationId) query = query.eq('organization_id', organizationId)
@@ -795,6 +904,7 @@ export async function createNote(
   contactId?: number,
   createdBy: string = 'System User'
 ) {
+  const supabase = await getSupabaseClient()
   const record: any = { content, created_by: createdBy }
   if (opportunityId) record.opportunity_id = opportunityId
   if (organizationId) record.organization_id = organizationId
@@ -822,6 +932,7 @@ export async function createNote(
 }
 
 export async function getOpportunityDetail(id: string) {
+  const supabase = await getSupabaseClient()
   const { data, error } = await supabase
     .from('opportunities')
     .select('*, organizations(name, industry, website_url)')
@@ -832,6 +943,7 @@ export async function getOpportunityDetail(id: string) {
 }
 
 export async function deleteNote(id: string) {
+  const supabase = await getSupabaseClient()
   const { data, error } = await supabase
     .from('notes')
     .delete()
@@ -842,73 +954,251 @@ export async function deleteNote(id: string) {
 }
 
 // ==========================================
-// AUTHENTICATION ACTIONS
+// AUTHENTICATION ACTIONS (PROPER SUPABASE AUTH)
 // ==========================================
 export async function sendOtpAction(email: string) {
   const cleanEmail = email ? email.toLowerCase().trim() : ''
-  if (!cleanEmail || !cleanEmail.includes('@')) {
-    return { error: "Please enter a valid email address." }
-  }
-  // Enforce domain restrictions
-  if (!cleanEmail.includes('humppl')) {
+  if (!cleanEmail || !cleanEmail.includes('@') || !cleanEmail.includes('humppl')) {
     return { error: "Access denied. Only @humppl.com or humppl-authorized emails can login." }
   }
-  // Generate random 6-digit OTP
-  const otp = Math.floor(100000 + Math.random() * 900000).toString()
-  
-  const cookieStore = await cookies()
-  cookieStore.set('humppl_temp_otp', JSON.stringify({ email: cleanEmail, otp }), {
-    path: '/',
-    maxAge: 60 * 5, // 5 minutes validity
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
+
+  const supabase = await getSupabaseClient()
+  const { error } = await supabase.auth.signInWithOtp({
+    email: cleanEmail,
+    options: {
+      shouldCreateUser: true,
+    }
   })
-  
-  console.log(`[OTP Sent] Email: ${cleanEmail} | OTP: ${otp}`)
-  return { success: true, otp }
+
+  if (error) {
+    console.error("Auth OTP send failed:", error.message)
+    return { error: error.message }
+  }
+
+  return { success: true }
 }
 
 export async function verifyOtpAction(email: string, enteredOtp: string) {
   const cleanEmail = email ? email.toLowerCase().trim() : ''
   const cleanOtp = enteredOtp ? enteredOtp.trim() : ''
-  
-  const cookieStore = await cookies()
-  const tempOtpCookie = cookieStore.get('humppl_temp_otp')
-  
-  if (!tempOtpCookie) {
-    return { error: "OTP expired or not requested. Please request a new OTP." }
+
+  // Support demo mode bypass with admin credentials
+  if (cleanEmail === 'humppllab@humppl.com' && cleanOtp === '123456') {
+    return await demoLoginAction()
   }
-  
-  try {
-    const { email: savedEmail, otp: savedOtp } = JSON.parse(tempOtpCookie.value)
-    if (savedEmail === cleanEmail && savedOtp === cleanOtp) {
-      cookieStore.delete('humppl_temp_otp')
-      
-      cookieStore.set('humppl_session', 'authenticated', {
-        path: '/',
-        maxAge: 60 * 60 * 24 * 7, // 1 week
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-      })
-      return { success: true }
-    }
-  } catch (e) {
-    // fallback
+
+  const supabase = await getSupabaseClient()
+  const { data, error } = await supabase.auth.verifyOtp({
+    email: cleanEmail,
+    token: cleanOtp,
+    type: 'email'
+  })
+
+  if (error) {
+    console.error("Auth verification failed:", error.message)
+    return { error: error.message }
   }
-  
-  return { error: "Incorrect OTP. Please check the code and try again." }
+
+  if (data && data.session) {
+    const cookieStore = await cookies()
+    cookieStore.set('humppl_session', 'authenticated', {
+      path: '/',
+      maxAge: 60 * 60 * 24 * 7,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+    })
+    cookieStore.set('sb-access-token', data.session.access_token, {
+      path: '/',
+      maxAge: 60 * 60 * 24 * 7,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+    })
+    return { success: true }
+  }
+
+  return { error: "Verification failed. Invalid OTP or session." }
+}
+
+export async function demoLoginAction() {
+  const supabase = await getSupabaseClient()
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email: 'humppllab@humppl.com',
+    password: 'Password123!'
+  })
+
+  if (error) {
+    console.error("Demo login bypass failed:", error.message)
+    return { error: "Demo user has not been seeded yet. Please link database and run seed migrations." }
+  }
+
+  if (data && data.session) {
+    const cookieStore = await cookies()
+    cookieStore.set('humppl_session', 'authenticated', {
+      path: '/',
+      maxAge: 60 * 60 * 24 * 7,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+    })
+    cookieStore.set('sb-access-token', data.session.access_token, {
+      path: '/',
+      maxAge: 60 * 60 * 24 * 7,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+    })
+    return { success: true }
+  }
+
+  return { error: "Demo session bypass failed." }
 }
 
 export async function logoutAction() {
   const cookieStore = await cookies()
   cookieStore.delete('humppl_session')
+  cookieStore.delete('sb-access-token')
+
+  const supabase = await getSupabaseClient()
+  await supabase.auth.signOut()
+
   return { success: true }
 }
 
 // ==========================================
-// UNIFIED CRM WORKFLOW ACTIONS
+// CAMPAIGNS ACTIONS
+// ==========================================
+export async function getCampaigns() {
+  const supabase = await getSupabaseClient()
+  const { data, error } = await supabase
+    .from('campaigns')
+    .select('*')
+    .order('created_at', { ascending: false })
+  if (error) throw new Error(error.message)
+  return data || []
+}
+
+export async function createCampaign(title: string, objective: string, status: string = 'Planned') {
+  const supabase = await getSupabaseClient()
+  const { data, error } = await supabase
+    .from('campaigns')
+    .insert([{ title, objective, status }])
+    .select()
+  if (error) throw new Error(error.message)
+  return data ? data[0] : null
+}
+
+export async function getCampaignMembers(campaignId: string) {
+  const supabase = await getSupabaseClient()
+  const { data, error } = await supabase
+    .from('campaign_members')
+    .select('*, contacts(*), leads(*)')
+    .eq('campaign_id', campaignId)
+  if (error) throw new Error(error.message)
+  return data || []
+}
+
+export async function addCampaignMember(campaignId: string, contactId?: number, leadId?: number) {
+  const supabase = await getSupabaseClient()
+  const record: any = { campaign_id: campaignId }
+  if (contactId) record.contact_id = contactId
+  if (leadId) record.lead_id = leadId
+
+  const { data, error } = await supabase
+    .from('campaign_members')
+    .insert([record])
+    .select()
+  if (error) throw new Error(error.message)
+  return data ? data[0] : null
+}
+
+export async function logEmailCampaignActivity(
+  campaignId: string,
+  contactId: number,
+  subject: string,
+  body: string
+) {
+  const supabase = await getSupabaseClient()
+  const { data, error } = await supabase
+    .from('email_logs')
+    .insert([{ campaign_id: campaignId, contact_id: contactId, subject, body, send_status: 'Sent' }])
+    .select()
+  if (error) throw new Error(error.message)
+  return data ? data[0] : null
+}
+
+// ==========================================
+// SUPPORT TICKETS ACTIONS
+// ==========================================
+export async function getTickets() {
+  const supabase = await getSupabaseClient()
+  const { data, error } = await supabase
+    .from('tickets')
+    .select('*, organizations(name)')
+    .order('created_at', { ascending: false })
+  if (error) throw new Error(error.message)
+  return data || []
+}
+
+export async function createTicket(
+  title: string,
+  organizationId: number,
+  category: string,
+  priority: string,
+  description: string
+) {
+  const supabase = await getSupabaseClient()
+  const slaTarget = new Date()
+  if (priority === 'High') slaTarget.setHours(slaTarget.getHours() + 24)
+  else if (priority === 'Medium') slaTarget.setHours(slaTarget.getHours() + 48)
+  else slaTarget.setHours(slaTarget.getHours() + 72)
+
+  const { data, error } = await supabase
+    .from('tickets')
+    .insert([{ title, organization_id: organizationId, category, priority, description, status: 'Open', sla_target: slaTarget.toISOString() }])
+    .select()
+  if (error) throw new Error(error.message)
+  return data ? data[0] : null
+}
+
+export async function updateTicketStatus(ticketId: string, status: string, resolutionNotes?: string) {
+  const supabase = await getSupabaseClient()
+  const record: any = { status }
+  if (resolutionNotes) record.resolution_notes = resolutionNotes
+
+  const { data, error } = await supabase
+    .from('tickets')
+    .update(record)
+    .eq('id', ticketId)
+    .select()
+  if (error) throw new Error(error.message)
+  return data ? data[0] : null
+}
+
+export async function getTicketComments(ticketId: string) {
+  const supabase = await getSupabaseClient()
+  const { data, error } = await supabase
+    .from('ticket_comments')
+    .select('*')
+    .eq('ticket_id', ticketId)
+    .order('created_at', { ascending: true })
+  if (error) throw new Error(error.message)
+  return data || []
+}
+
+export async function addTicketComment(ticketId: string, content: string, createdBy: string) {
+  const supabase = await getSupabaseClient()
+  const { data, error } = await supabase
+    .from('ticket_comments')
+    .insert([{ ticket_id: ticketId, content, created_by: createdBy }])
+    .select()
+  if (error) throw new Error(error.message)
+  return data ? data[0] : null
+}
+
+// ==========================================
+// UNIFIED FLOW & RESCHEDULE ACTIONS
 // ==========================================
 export async function createContactWithOrgAndOpp(
   firstName: string,
@@ -926,7 +1216,7 @@ export async function createContactWithOrgAndOpp(
   oppValue: number,
   oppOwner: string
 ) {
-  // 1. Create or Find Organization
+  const supabase = await getSupabaseClient()
   let orgId: number
   const { data: existingOrgs, error: findError } = await supabase
     .from('organizations')
@@ -947,10 +1237,8 @@ export async function createContactWithOrgAndOpp(
     orgId = newOrg[0].id
   }
 
-  // 2. Format jobTitle to store phone numbers
   const formattedJobTitle = `${jobTitle || 'N/A'} | Ph: ${phone || 'N/A'} | Mob: ${mobile || 'N/A'}`
 
-  // 3. Create Contact linked to Org
   const { data: newContact, error: contactError } = await supabase
     .from('contacts')
     .insert([{ 
@@ -965,7 +1253,6 @@ export async function createContactWithOrgAndOpp(
   if (contactError) throw new Error(contactError.message)
   const contact = newContact[0]
 
-  // 4. Create Opportunity linked to Org
   const { data: newOpp, error: oppError } = await supabase
     .from('opportunities')
     .insert([{ 
@@ -981,7 +1268,6 @@ export async function createContactWithOrgAndOpp(
   if (oppError) throw new Error(oppError.message)
   const opp = newOpp[0]
 
-  // 5. Automatically create a Note detailing the contact and phone numbers
   await createNote(
     `Contact created via Unified Flow.\nPhone: ${phone || 'N/A'}\nMobile: ${mobile || 'N/A'}\nLinked Organization: ${orgName}\nLinked Opportunity: ${oppName} (${formatRupees(oppValue)})`,
     opp.id,
@@ -990,7 +1276,6 @@ export async function createContactWithOrgAndOpp(
     oppOwner
   )
 
-  // 6. Log activity timeline
   await logActivity(
     'Unified Contact Created',
     `Created contact ${firstName} ${lastName}, organization ${orgName}, and opportunity ${oppName}`,
@@ -1003,27 +1288,58 @@ export async function createContactWithOrgAndOpp(
   return { contact, orgId, opp }
 }
 
-export async function updateMeetingDateTime(id: string, dateTimeStr: string) {
+// ==========================================
+// CSV EXPORT DATA HELPERS
+// ==========================================
+export async function getOrganizationsCsvData() {
+  const supabase = await getSupabaseClient()
   const { data, error } = await supabase
-    .from('meetings')
-    .update({ date_time: dateTimeStr })
-    .eq('id', id)
-    .select()
-
+    .from('organizations')
+    .select('name, industry, website_url, segment, priority, owner, status')
+    .eq('archived', false)
+    .order('name', { ascending: true })
   if (error) throw new Error(error.message)
-
-  if (data && data[0]) {
-    await logActivity(
-      'Meeting Rescheduled',
-      `Rescheduled meeting: "${data[0].title}" to ${new Date(dateTimeStr).toLocaleString()}`,
-      'meeting_scheduled',
-      undefined,
-      data[0].organization_id
-    )
-  }
-
-  return data ? data[0] : null
+  return data || []
 }
 
+export async function getContactsCsvData() {
+  const supabase = await getSupabaseClient()
+  const { data, error } = await supabase
+    .from('contacts')
+    .select('first_name, last_name, email, job_title, organizations(name), contact_type, relationship_strength')
+    .eq('archived', false)
+    .order('first_name', { ascending: true })
+  if (error) throw new Error(error.message)
+  return data || []
+}
 
+export async function getProposalsCsvData() {
+  const supabase = await getSupabaseClient()
+  const { data, error } = await supabase
+    .from('proposals')
+    .select('title, organizations(name), value, status, date_sent, validity_date, payment_terms')
+    .order('created_at', { ascending: false })
+  if (error) throw new Error(error.message)
+  return data || []
+}
+
+export async function getCampaignsCsvData() {
+  const supabase = await getSupabaseClient()
+  const { data, error } = await supabase
+    .from('campaigns')
+    .select('title, objective, audience_segment, status, owner')
+    .order('created_at', { ascending: false })
+  if (error) throw new Error(error.message)
+  return data || []
+}
+
+export async function getTicketsCsvData() {
+  const supabase = await getSupabaseClient()
+  const { data, error } = await supabase
+    .from('tickets')
+    .select('title, organizations(name), owner, priority, category, status, sla_target')
+    .order('created_at', { ascending: false })
+  if (error) throw new Error(error.message)
+  return data || []
+}
 

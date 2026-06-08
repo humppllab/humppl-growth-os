@@ -15,7 +15,7 @@ export default function TeamManagement() {
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<TeamMember | null>(null);
-  const [form, setForm] = useState({ name: "", email: "", role: "Viewer" as const });
+  const [form, setForm] = useState<{ name: string; email: string; role: "Admin" | "Manager" | "Executive" | "Viewer" }>({ name: "", email: "", role: "Viewer" });
 
   useEffect(() => {
     try {

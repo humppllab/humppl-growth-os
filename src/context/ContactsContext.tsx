@@ -7,7 +7,7 @@ type Contact = any
 
 type ContactsContextValue = {
   contacts: Contact[]
-  setContacts: (c: Contact[]) => void
+  setContacts: React.Dispatch<React.SetStateAction<Contact[]>>
   loading: boolean
   refresh: () => Promise<void>
 }
@@ -45,7 +45,7 @@ export const ContactsProvider = ({ children }: { children: React.ReactNode }) =>
   }, [contacts])
 
   return (
-    <ContactsContext.Provider value={{ contacts, setContacts: (c: Contact[]) => setContacts(c), loading, refresh: load }}>
+    <ContactsContext.Provider value={{ contacts, setContacts, loading, refresh: load }}>
       {children}
     </ContactsContext.Provider>
   )
