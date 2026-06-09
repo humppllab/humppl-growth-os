@@ -196,3 +196,11 @@ CREATE POLICY "Select Pipeline Stages" ON public.pipeline_stages
 
 CREATE POLICY "Write Pipeline Stages" ON public.pipeline_stages
   FOR ALL USING (public.get_user_role() = 'Admin');
+
+-- 25. Profile Settings Policies
+CREATE POLICY "Select Profile Settings" ON public.profile_settings
+  FOR SELECT USING (auth.role() = 'authenticated');
+
+CREATE POLICY "Write Profile Settings" ON public.profile_settings
+  FOR ALL USING (auth.role() = 'authenticated');
+

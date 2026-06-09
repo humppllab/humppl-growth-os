@@ -402,3 +402,18 @@ CREATE TABLE IF NOT EXISTS public.pipeline_stages (
 
 -- Enable RLS on Pipeline Stages
 ALTER TABLE public.pipeline_stages ENABLE ROW LEVEL SECURITY;
+
+-- 25. Profile Settings Table
+CREATE TABLE IF NOT EXISTS public.profile_settings (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
+  updated_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
+  first_name text,
+  last_name text,
+  email text UNIQUE NOT NULL,
+  company_name text DEFAULT 'Humppl Private Limited'::text NOT NULL
+);
+
+-- Enable RLS on Profile Settings
+ALTER TABLE public.profile_settings ENABLE ROW LEVEL SECURITY;
+
